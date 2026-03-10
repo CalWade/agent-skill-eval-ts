@@ -16,6 +16,7 @@ Thumbs.db
 
 # 敏感配置
 .env
+docs/openclaw-api.md
 
 # 测试结果（每人不同，自动生成）
 results/*.json
