@@ -13,8 +13,8 @@
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
 import yaml from 'js-yaml';
-import { loadConfig } from './config.js';
-import { MODELS, filterModels, listModelIds } from './models.js';
+import { loadConfig } from './services/configService.js';
+import { getModels, filterModels } from './services/modelService.js';
 import { runAll } from './runner.js';
 import { printSuiteHeader, printFinalSummary, saveReport } from './report.js';
 import type { TestSuite, EvalReport } from './types.js';
@@ -85,9 +85,8 @@ async function main(): Promise<void> {
   // --list-models：列出所有可用模型后退出
   if (args.listModels) {
     console.log('可用模型:');
-    for (const id of listModelIds()) {
-      const m = MODELS.find((x) => x.id === id)!;
-      console.log(`  ${id.padEnd(24)} switchCmd: ${m.switchCmd}`);
+    for (const m of getModels()) {
+      console.log(`  ${m.id.padEnd(24)} switchCmd: ${m.switchCmd}`);
     }
     return;
   }
@@ -123,7 +122,7 @@ async function main(): Promise<void> {
 
   // 未知 model id 警告
   if (args.models.length > 0) {
-    const knownIds = new Set(listModelIds());
+    const knownIds = new Set(getModels().map((m) => m.id));
     for (const id of args.models) {
       if (!knownIds.has(id)) {
         console.warn(`警告: 未知模型 "${id}"，已跳过`);
