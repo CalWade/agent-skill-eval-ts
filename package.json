@@ -1,31 +1,45 @@
 {
   "name": "agent-skill-eval",
-  "version": "0.2.0",
-  "description": "AI Agent 技能质量评估框架（TypeScript）",
+  "version": "1.0.0",
+  "description": "AI Agent Skill 多模型评测工具（TypeScript）",
   "type": "module",
   "scripts": {
-    "eval": "tsx src/cli.ts",
-    "smoke": "tsx src/cli.ts --suite examples/openclaw-feishu/test-cases/safe-smoke.yaml",
-    "smoke:dry": "tsx src/cli.ts --suite examples/openclaw-feishu/test-cases/safe-smoke.yaml --dry-run",
-    "test": "vitest run",
-    "test:watch": "vitest",
+    "dev": "concurrently \"tsx server/api.ts\" \"pnpm --filter web dev\"",
+    "server": "tsx server/api.ts",
+    "eval": "tsx server/cli.ts",
+    "smoke": "tsx server/cli.ts --suite examples/feishu/smoke.yaml",
+    "smoke:dry": "tsx server/cli.ts --suite examples/feishu/smoke.yaml --dry-run",
+    "smoke:safe": "tsx server/cli.ts --suite examples/feishu/smoke.yaml --safe-only",
+    "models": "tsx server/cli.ts --list-models",
     "typecheck": "tsc --noEmit",
     "build": "tsc"
   },
-  "keywords": ["agent", "eval", "llm", "testing"],
+  "keywords": [
+    "agent",
+    "eval",
+    "llm",
+    "testing"
+  ],
   "author": "Calvin Wei",
   "license": "MIT",
   "engines": {
     "node": ">=18.0.0"
   },
   "dependencies": {
+    "cors": "^2.8.6",
     "dotenv": "^17.3.1",
-    "eventsource-parser": "^3.0.6",
+    "express": "^5.2.1",
     "js-yaml": "^4.1.1"
   },
+  "optionalDependencies": {
+    "eventsource-parser": "^3.0.6"
+  },
   "devDependencies": {
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
     "@types/js-yaml": "^4.0.9",
     "@types/node": "^25.4.0",
+    "concurrently": "^9.2.1",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3",
     "vitest": "^4.0.18"
