@@ -3,9 +3,15 @@
     <template #header>
       <div style="display:flex;align-items:center;justify-content:space-between">
         <span>测试配置</span>
-        <el-button size="small" type="success" :loading="running" :disabled="!canRun" @click="run">
-          ▶ 开始测试
-        </el-button>
+        <button
+          class="cta-btn"
+          :class="{ running, disabled: !canRun }"
+          :disabled="!canRun"
+          @click="run"
+        >
+          <span v-if="running">EXECUTING...</span>
+          <span v-else>▶ START TEST</span>
+        </button>
       </div>
     </template>
 
@@ -15,12 +21,20 @@
       <el-button size="small" text @click="openModelEditor">编辑列表</el-button>
     </div>
     <div class="model-grid">
-      <el-checkbox
+      <label
         v-for="m in models"
         :key="m.id"
-        v-model="selectedModelIds"
-        :label="m.id"
-      >{{ m.id }}</el-checkbox>
+        class="model-checkbox-label"
+        :class="{ checked: selectedModelIds.includes(m.id) }"
+      >
+        <input
+          type="checkbox"
+          :value="m.id"
+          v-model="selectedModelIds"
+          class="model-checkbox-input"
+        />
+        {{ m.id }}
+      </label>
     </div>
 
     <!-- 套件选择 -->
@@ -55,13 +69,18 @@
     </div>
 
     <div class="case-list">
-      <div v-for="(c, idx) in suite.cases" :key="c.id" class="case-item">
+      <div
+        v-for="(c, idx) in suite.cases"
+        :key="c.id"
+        class="case-item"
+        :class="{ 'case-item-alt': idx % 2 === 1 }"
+      >
         <div class="case-header">
           <span class="case-id">{{ c.id }}</span>
           <el-tag size="small" :type="sideEffectTagType(c.side_effect)">{{ c.side_effect || 'none' }}</el-tag>
           <div style="flex:1" />
           <el-button size="small" text @click="editCase(idx)">编辑</el-button>
-          <el-button size="small" text type="danger" @click="removeCase(idx)">删除</el-button>
+          <button class="delete-btn" @click="removeCase(idx)">删除</button>
         </div>
         <div class="case-title">{{ c.title }}</div>
         <div class="case-instruction">{{ c.instruction }}</div>
@@ -82,30 +101,32 @@
 
   <!-- 模型列表编辑对话框 -->
   <el-dialog v-model="modelDialogVisible" title="编辑模型列表" width="400px" align-center>
-    <div style="margin-bottom:14px">
-      <div style="font-size:12px;color:#888;margin-bottom:4px">
-        切换指令前缀（实际发送：前缀 + 空格 + 模型名）
+    <div class="dialog-inner">
+      <div style="margin-bottom:14px">
+        <div class="dialog-hint">
+          切换指令前缀（实际发送：前缀 + 空格 + 模型名）
+        </div>
+        <el-input v-model="editingPrefix" size="small" placeholder="/model" />
       </div>
-      <el-input v-model="editingPrefix" size="small" placeholder="/model" />
-    </div>
-    <div style="font-size:12px;color:#888;margin-bottom:6px">模型名列表</div>
-    <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:10px">
-      <div
-        v-for="(_, idx) in editingIds"
-        :key="idx"
-        style="display:flex;align-items:center;gap:6px"
-      >
-        <span style="font-size:12px;color:#555;width:20px;text-align:right;flex-shrink:0">{{ idx + 1 }}</span>
-        <el-input v-model="editingIds[idx]" size="small" :placeholder="`模型名，如 gpt-4o`" style="flex:1" />
-        <span style="font-size:11px;color:#444;font-family:monospace;flex-shrink:0">
-          → {{ editingPrefix }} {{ editingIds[idx] || '...' }}
-        </span>
-        <el-button size="small" text type="danger" @click="removeModel(idx)">×</el-button>
+      <div class="dialog-hint" style="margin-bottom:6px">模型名列表</div>
+      <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:10px">
+        <div
+          v-for="(_, idx) in editingIds"
+          :key="idx"
+          style="display:flex;align-items:center;gap:6px"
+        >
+          <span class="dialog-index">{{ idx + 1 }}</span>
+          <el-input v-model="editingIds[idx]" size="small" :placeholder="`模型名，如 gpt-4o`" style="flex:1" />
+          <span class="dialog-preview">
+            → {{ editingPrefix }} {{ editingIds[idx] || '...' }}
+          </span>
+          <el-button size="small" text type="danger" @click="removeModel(idx)">×</el-button>
+        </div>
       </div>
+      <el-button size="small" plain style="width:100%;margin-bottom:4px" @click="addModel">
+        + 添加模型
+      </el-button>
     </div>
-    <el-button size="small" plain style="width:100%;margin-bottom:4px" @click="addModel">
-      + 添加模型
-    </el-button>
     <template #footer>
       <el-button size="small" @click="modelDialogVisible = false">取消</el-button>
       <el-button size="small" type="primary" :loading="savingModels" @click="confirmModelEdit">
@@ -116,57 +137,59 @@
 
   <!-- 用例编辑对话框 -->
   <el-dialog v-model="dialogVisible" title="编辑用例" width="560px" align-center>
-    <el-form :model="editingCase" size="small" label-position="top">
-      <el-row :gutter="8">
-        <el-col :span="10">
-          <el-form-item label="ID">
-            <el-input v-model="editingCase.id" placeholder="TC-01" />
-          </el-form-item>
-        </el-col>
-        <el-col :span="14">
-          <el-form-item label="副作用">
-            <el-select v-model="editingCase.side_effect" style="width:100%">
-              <el-option value="none" label="none（无）" />
-              <el-option value="read" label="read（只读）" />
-              <el-option value="write" label="write（写入）" />
-            </el-select>
-          </el-form-item>
-        </el-col>
-      </el-row>
-      <el-form-item label="标题">
-        <el-input v-model="editingCase.title" placeholder="测试用例名称" />
-      </el-form-item>
-      <el-form-item label="指令（发给 Agent 的内容）">
-        <el-input v-model="editingCase.instruction" type="textarea" :rows="3" />
-      </el-form-item>
+    <div class="dialog-inner">
+      <el-form :model="editingCase" size="small" label-position="top">
+        <el-row :gutter="8">
+          <el-col :span="10">
+            <el-form-item label="ID">
+              <el-input v-model="editingCase.id" placeholder="TC-01" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="14">
+            <el-form-item label="副作用">
+              <el-select v-model="editingCase.side_effect" style="width:100%">
+                <el-option value="none" label="none（无）" />
+                <el-option value="read" label="read（只读）" />
+                <el-option value="write" label="write（写入）" />
+              </el-select>
+            </el-form-item>
+          </el-col>
+        </el-row>
+        <el-form-item label="标题">
+          <el-input v-model="editingCase.title" placeholder="测试用例名称" />
+        </el-form-item>
+        <el-form-item label="指令（发给 Agent 的内容）">
+          <el-input v-model="editingCase.instruction" type="textarea" :rows="3" />
+        </el-form-item>
 
-      <!-- 判定条件 -->
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
-        <span style="font-size:12px;color:#888">判定条件（可选，不填则只展示回复）</span>
-        <el-button size="small" plain @click="addCriteria">+ 添加</el-button>
-      </div>
+        <!-- 判定条件 -->
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+          <span class="dialog-hint">判定条件（可选，不填则只展示回复）</span>
+          <el-button size="small" plain @click="addCriteria">+ 添加</el-button>
+        </div>
 
-      <div v-for="(cr, ci) in editingCase.pass_criteria" :key="ci" class="criteria-row">
-        <el-select v-model="cr.type" size="small" style="width:160px;flex-shrink:0" @change="onCriteriaTypeChange(cr)">
-          <el-option value="output_contains" label="包含文本" />
-          <el-option value="output_not_contains" label="不包含文本" />
-          <el-option value="output_contains_any" label="包含任意一个" />
-        </el-select>
+        <div v-for="(cr, ci) in editingCase.pass_criteria" :key="ci" class="criteria-row">
+          <el-select v-model="cr.type" size="small" style="width:160px;flex-shrink:0" @change="onCriteriaTypeChange(cr)">
+            <el-option value="output_contains" label="包含文本" />
+            <el-option value="output_not_contains" label="不包含文本" />
+            <el-option value="output_contains_any" label="包含任意一个" />
+          </el-select>
 
-        <template v-if="cr.type === 'output_contains' || cr.type === 'output_not_contains'">
-          <el-input v-model="(cr as any).text" size="small" placeholder="文本内容" style="flex:1" />
-        </template>
-        <template v-else-if="cr.type === 'output_contains_any'">
-          <el-input
-            :model-value="(cr as any).texts?.join(', ')"
-            @update:model-value="(v: string) => { (cr as any).texts = v.split(',').map((s:string) => s.trim()).filter(Boolean) }"
-            size="small" placeholder="用逗号分隔多个文本" style="flex:1"
-          />
-        </template>
+          <template v-if="cr.type === 'output_contains' || cr.type === 'output_not_contains'">
+            <el-input v-model="(cr as any).text" size="small" placeholder="文本内容" style="flex:1" />
+          </template>
+          <template v-else-if="cr.type === 'output_contains_any'">
+            <el-input
+              :model-value="(cr as any).texts?.join(', ')"
+              @update:model-value="(v: string) => { (cr as any).texts = v.split(',').map((s:string) => s.trim()).filter(Boolean) }"
+              size="small" placeholder="用逗号分隔多个文本" style="flex:1"
+            />
+          </template>
 
-        <el-button size="small" text type="danger" @click="removeCriteria(ci)">×</el-button>
-      </div>
-    </el-form>
+          <el-button size="small" text type="danger" @click="removeCriteria(ci)">×</el-button>
+        </div>
+      </el-form>
+    </div>
 
     <template #footer>
       <el-button size="small" @click="dialogVisible = false">取消</el-button>
@@ -288,7 +311,6 @@ async function confirmModelEdit() {
     await saveModels(editingPrefix.value.trim(), validIds)
     const resp = await getModels()
     models.value = resp.models
-    // 移除已不存在的勾选项
     const idSet = new Set(validIds)
     selectedModelIds.value = selectedModelIds.value.filter((id) => idSet.has(id))
     modelDialogVisible.value = false
@@ -375,17 +397,192 @@ function sideEffectTagType(se?: string): 'success' | 'warning' | 'danger' | '' {
 </script>
 
 <style scoped>
-.section-label { font-size: 12px; color: #888; margin-bottom: 6px; }
-.model-grid { display: flex; flex-wrap: wrap; gap: 4px 12px; }
-.case-list { display: flex; flex-direction: column; gap: 6px; max-height: 320px; overflow-y: auto; }
-.case-item {
-  background: #0f1117; border: 1px solid #2a2d3e; border-radius: 6px;
-  padding: 8px 10px; cursor: default;
+/* ── section-label ── */
+.section-label {
+  font-size: var(--fs-sm, 12px);
+  color: var(--text-secondary, #888);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 6px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
-.case-header { display: flex; align-items: center; gap: 6px; margin-bottom: 3px; }
-.case-id { font-size: 11px; color: #a78bfa; font-family: monospace; }
-.case-title { font-size: 13px; color: #e0e0e0; }
-.case-instruction { font-size: 12px; color: #888; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.case-criteria { font-size: 11px; color: #60a5fa; margin-top: 3px; }
-.criteria-row { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
+.section-label::before {
+  content: '';
+  display: inline-block;
+  width: 3px;
+  height: 12px;
+  background: var(--accent-cyan, #00c8d4);
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+/* ── model checkbox grid ── */
+.model-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  background: var(--bg-card, #0f1117);
+  border: 1px solid var(--border-card, #2a2d3e);
+  border-radius: var(--radius-card, 8px);
+  padding: 8px 10px;
+}
+.model-checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-family: var(--font-mono, monospace);
+  font-size: var(--fs-sm, 12px);
+  color: var(--text-secondary, #888);
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 4px;
+  transition: color 0.15s;
+  user-select: none;
+}
+.model-checkbox-label.checked {
+  color: var(--accent-cyan, #00c8d4);
+}
+.model-checkbox-input {
+  accent-color: var(--accent-cyan, #00c8d4);
+  cursor: pointer;
+}
+
+/* ── case list ── */
+.case-list {
+  display: flex;
+  flex-direction: column;
+  max-height: 320px;
+  overflow-y: auto;
+}
+.case-item {
+  background: var(--bg-table-row, #0f1117);
+  padding: 8px 10px;
+  cursor: default;
+  border-left: 2px solid transparent;
+  transition: background 0.15s, border-color 0.15s;
+}
+.case-item-alt {
+  background: var(--bg-table-row-alt, #111318);
+}
+.case-item:hover {
+  background: rgba(0, 200, 212, 0.05);
+  border-left: 2px solid var(--accent-cyan, #00c8d4);
+}
+.case-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 3px;
+}
+.case-id {
+  font-size: 11px;
+  color: var(--accent-cyan, #00c8d4);
+  font-family: var(--font-mono, monospace);
+}
+.case-title {
+  font-size: 13px;
+  color: var(--text-primary, #e0e0e0);
+}
+.case-instruction {
+  font-size: 12px;
+  color: var(--text-muted, #888);
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.case-criteria {
+  font-size: 11px;
+  color: var(--accent-cyan-dim, #60a5fa);
+  margin-top: 3px;
+}
+
+/* ── delete button ── */
+.delete-btn {
+  background: transparent;
+  border: none;
+  padding: 2px 6px;
+  font-size: 12px;
+  color: var(--text-muted, #555);
+  cursor: pointer;
+  border-radius: 4px;
+  transition: color 0.15s;
+}
+.delete-btn:hover {
+  color: var(--status-fail, #f56c6c);
+}
+
+/* ── CTA button ── */
+.cta-btn {
+  background: var(--warn-amber, #f5a623);
+  color: #0d0f11;
+  border: none;
+  padding: 6px 16px;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  border-radius: var(--radius-base, 4px);
+  cursor: pointer;
+  transition: background 0.15s, transform 0.1s, box-shadow 0.1s;
+}
+.cta-btn:hover:not(.disabled):not(.running) {
+  background: #f7b840;
+}
+.cta-btn:active:not(.disabled) {
+  background: #d4901a;
+  transform: translateY(1px);
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+.cta-btn.disabled {
+  background: rgba(245, 166, 35, 0.25);
+  color: rgba(0, 0, 0, 0.4);
+  cursor: not-allowed;
+}
+.cta-btn.running {
+  background: rgba(245, 166, 35, 0.6);
+  cursor: not-allowed;
+}
+
+/* ── criteria row ── */
+.criteria-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+/* ── dialog inner ── */
+.dialog-hint {
+  font-size: 12px;
+  color: var(--text-muted, #888);
+  margin-bottom: 4px;
+}
+.dialog-index {
+  font-size: 12px;
+  color: var(--text-secondary, #555);
+  width: 20px;
+  text-align: right;
+  flex-shrink: 0;
+}
+.dialog-preview {
+  font-size: 11px;
+  color: var(--text-muted, #444);
+  font-family: var(--font-mono, monospace);
+  flex-shrink: 0;
+}
+</style>
+
+<!-- Dialog background override (non-scoped) -->
+<style>
+.el-dialog {
+  background: var(--bg-card-raised, #161920) !important;
+}
+.el-dialog__title {
+  text-transform: uppercase;
+  color: var(--text-heading, #e0e0e0) !important;
+  letter-spacing: 0.06em;
+}
 </style>

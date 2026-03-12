@@ -3,10 +3,10 @@
     <template #header>API 配置</template>
     <el-form :model="form" size="small" label-position="top">
       <el-form-item label="Agent API URL">
-        <el-input v-model="form.agentApiUrl" placeholder="https://..." />
+        <el-input v-model="form.agentApiUrl" placeholder="https://..." class="input-mono" />
       </el-form-item>
       <el-form-item label="API Key">
-        <el-input v-model="form.agentApiKey" type="password" show-password placeholder="sk-..." />
+        <el-input v-model="form.agentApiKey" type="password" show-password placeholder="sk-..." class="input-mono" />
       </el-form-item>
       <el-form-item label="Instance ID（可选）">
         <el-input v-model="form.agentInstanceId" placeholder="平台特有参数" />
@@ -69,3 +69,12 @@ async function save() {
   }
 }
 </script>
+
+<style scoped>
+/* Monospace inputs for URL and Key */
+:deep(.input-mono .el-input__inner) {
+  font-family: var(--font-mono);
+  font-size: var(--fs-sm);
+  letter-spacing: 0.02em;
+}
+</style>

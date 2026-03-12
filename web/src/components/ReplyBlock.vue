@@ -9,7 +9,7 @@
     <div v-if="!result.call.success" class="reply-error">{{ result.call.error }}</div>
     <div v-else class="reply-text">{{ result.call.output }}</div>
     <div v-if="result.failReasons.length" class="fail-reasons">
-      <div v-for="r in result.failReasons" :key="r" class="fail-reason">⚠ {{ r }}</div>
+      <div v-for="r in result.failReasons" :key="r" class="fail-reason">▸ {{ r }}</div>
     </div>
   </div>
 </template>
@@ -20,16 +20,85 @@ defineProps<{ result?: CaseModelResult }>()
 </script>
 
 <style scoped>
-.reply-empty { color: #444; font-size: 12px; }
-.reply-wrap { background: #0a0c14; border-radius: 6px; padding: 8px 10px; }
-.reply-meta { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
-.verdict-tag { font-size: 10px; padding: 1px 6px; border-radius: 4px; font-weight: 600; }
-.verdict-tag.pass { background: #14532d; color: #4ade80; }
-.verdict-tag.fail { background: #450a0a; color: #f87171; }
-.verdict-tag.display { background: #1e3a5f; color: #60a5fa; }
-.meta-dur, .meta-tok { font-size: 11px; color: #555; }
-.reply-text { font-size: 12px; color: #bbb; line-height: 1.6; white-space: pre-wrap; word-break: break-all; max-height: 200px; overflow-y: auto; }
-.reply-error { font-size: 12px; color: #f87171; }
-.fail-reasons { margin-top: 6px; }
-.fail-reason { font-size: 11px; color: #fb923c; }
+.reply-empty {
+  color: var(--text-muted, #444);
+  font-size: 12px;
+}
+.reply-wrap {
+  border-radius: 6px;
+  padding: 8px 10px;
+}
+.reply-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+.verdict-tag {
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: var(--radius-sm, 3px);
+  font-weight: 600;
+  font-family: var(--font-mono, monospace);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.verdict-tag.pass {
+  background: var(--status-pass-dim, rgba(63,200,122,0.12));
+  color: var(--status-pass, #3fc87a);
+}
+.verdict-tag.fail {
+  background: var(--status-fail-dim, rgba(224,74,74,0.12));
+  color: var(--status-fail, #e04a4a);
+}
+.verdict-tag.display {
+  background: transparent;
+  color: var(--status-skip, #6b7280);
+  border: 1px dashed var(--status-skip, #6b7280);
+}
+.meta-dur {
+  font-family: var(--font-mono, monospace);
+  font-size: var(--fs-xs, 11px);
+  color: var(--text-secondary, #888);
+}
+.meta-tok {
+  font-family: var(--font-mono, monospace);
+  font-size: var(--fs-xs, 11px);
+  color: var(--text-muted, #555);
+  font-variant-numeric: tabular-nums;
+}
+.reply-text {
+  background: var(--bg-root, #0a0c14);
+  border: 1px solid var(--border-base, rgba(255,255,255,0.08));
+  border-left: 3px solid var(--accent-cyan-dim, rgba(0,200,212,0.3));
+  border-radius: 4px;
+  padding: 8px 10px;
+  font-size: var(--fs-sm, 12px);
+  color: var(--text-primary, #d4d4d4);
+  line-height: 1.7;
+  white-space: pre-wrap;
+  word-break: break-all;
+  max-height: 200px;
+  overflow-y: auto;
+}
+.reply-error {
+  font-size: 12px;
+  color: var(--status-fail, #e04a4a);
+  background: rgba(224,74,74,0.06);
+  border-left: 3px solid var(--status-fail, #e04a4a);
+  padding: 6px 10px;
+  border-radius: 4px;
+}
+.fail-reasons {
+  margin-top: 6px;
+  background: rgba(224,74,74,0.06);
+  border-left: 3px solid var(--status-fail, #e04a4a);
+  border-radius: 4px;
+  padding: 6px 10px;
+}
+.fail-reason {
+  font-size: 11px;
+  color: var(--status-fail, #e04a4a);
+  line-height: 1.6;
+}
 </style>
