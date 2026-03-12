@@ -1,19 +1,6 @@
 <template>
   <el-card>
-    <template #header>
-      <div style="display:flex;align-items:center;justify-content:space-between">
-        <span>测试配置</span>
-        <button
-          class="cta-btn"
-          :class="{ running, disabled: !canRun }"
-          :disabled="!canRun"
-          @click="run"
-        >
-          <span v-if="running">EXECUTING...</span>
-          <span v-else>▶ START TEST</span>
-        </button>
-      </div>
-    </template>
+    <template #header>测试配置</template>
 
     <!-- 模型勾选 -->
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
@@ -199,7 +186,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, reactive } from 'vue'
+import { ref, onMounted, reactive, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { getModels, saveModels, getSuites, getSuite, saveSuite } from '../api'
 import type { ModelConfig, TestSuite, TestCase, PassCriteria } from '../types'
@@ -215,11 +202,12 @@ const suiteFiles = ref<string[]>([])
 const selectedFile = ref('')
 const suite = reactive<TestSuite>({ skill: '', description: '', cases: [] })
 const saving = ref(false)
-const running = ref(false)
 
-const canRun = computed(() =>
-  selectedModelIds.value.length > 0 && suite.cases.length > 0 && suite.skill.length > 0
-)
+function emitPayload() {
+  emit('run', { modelIds: selectedModelIds.value, suite: { ...suite } })
+}
+
+watch([selectedModelIds, () => suite.skill, () => suite.cases.length], emitPayload, { deep: true })
 
 onMounted(async () => {
   const resp = await getModels()
@@ -227,9 +215,10 @@ onMounted(async () => {
   selectedModelIds.value = models.value.slice(0, 2).map((m) => m.id)
   suiteFiles.value = await getSuites()
   if (suiteFiles.value.length > 0) {
-    selectedFile.value = suiteFiles.value[0]
+    selectedFile.value = suiteFiles.value[0] ?? ''
     await loadSuite()
   }
+  emitPayload()
 })
 
 async function loadSuite() {
@@ -266,13 +255,6 @@ async function saveSuiteToServer() {
   } finally {
     saving.value = false
   }
-}
-
-function run() {
-  if (!canRun.value) return
-  running.value = true
-  emit('run', { modelIds: selectedModelIds.value, suite: { ...suite } })
-  setTimeout(() => { running.value = false }, 1000)
 }
 
 // 模型列表编辑
@@ -342,8 +324,12 @@ function addCase() {
 function editCase(idx: number) {
   editingIdx = idx
   const c = suite.cases[idx]
+  if (!c) return
   editingCase.value = {
     ...c,
+    id: c.id ?? '',
+    title: c.title ?? '',
+    instruction: c.instruction ?? '',
     pass_criteria: JSON.parse(JSON.stringify(c.pass_criteria ?? [])),
   }
   dialogVisible.value = true
@@ -512,38 +498,6 @@ function sideEffectTagType(se?: string): 'success' | 'warning' | 'danger' | '' {
 }
 .delete-btn:hover {
   color: var(--status-fail, #f56c6c);
-}
-
-/* ── CTA button ── */
-.cta-btn {
-  background: var(--warn-amber, #f5a623);
-  color: #0d0f11;
-  border: none;
-  padding: 6px 16px;
-  font-size: 12px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  border-radius: var(--radius-base, 4px);
-  cursor: pointer;
-  transition: background 0.15s, transform 0.1s, box-shadow 0.1s;
-}
-.cta-btn:hover:not(.disabled):not(.running) {
-  background: #f7b840;
-}
-.cta-btn:active:not(.disabled) {
-  background: #d4901a;
-  transform: translateY(1px);
-  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.3);
-}
-.cta-btn.disabled {
-  background: rgba(245, 166, 35, 0.25);
-  color: rgba(0, 0, 0, 0.4);
-  cursor: not-allowed;
-}
-.cta-btn.running {
-  background: rgba(245, 166, 35, 0.6);
-  cursor: not-allowed;
 }
 
 /* ── criteria row ── */

@@ -1,5 +1,6 @@
 <template>
-  <el-card style="flex:1">
+  <div class="livelog-wrap">
+  <el-card class="livelog-card">
     <template #header>
       <div class="log-header">
         <span class="log-title">[LIVE LOG]</span>
@@ -18,6 +19,7 @@
       <div v-if="logs.length === 0" class="log-empty">AWAITING TEST...</div>
     </div>
   </el-card>
+  </div>
 </template>
 
 <script setup lang="ts">
@@ -68,9 +70,38 @@ function clear() { emit('clear') }
   letter-spacing: 0.06em;
 }
 
+/* Wrapper fills Zone B */
+.livelog-wrap {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+/* Card fills wrapper */
+:deep(.livelog-card) {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border-radius: 0 !important;
+  border-left: none !important;
+  border-right: none !important;
+  border-top: none !important;
+}
+
+:deep(.livelog-card .el-card__body) {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  padding: 10px 12px !important;
+}
+
 /* Log container */
 .log-container {
-  height: 360px;
+  flex: 1;
+  min-height: 0;
   overflow-y: auto;
   font-family: var(--font-mono);
   font-size: var(--fs-sm);

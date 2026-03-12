@@ -1,12 +1,10 @@
 <template>
-  <el-card>
-    <template #header>
-      <div style="display:flex;align-items:center;gap:8px">
-        <span>汇总大屏</span>
-        <el-tag size="small" effect="plain">{{ report.skill }}</el-tag>
-        <span style="font-size:11px;color:var(--text-muted,#555);margin-left:4px">{{ formatTime(report.timestamp) }}</span>
-      </div>
-    </template>
+  <div class="result-dashboard">
+    <div class="dashboard-header">
+      <span class="dashboard-title">汇总大屏</span>
+      <el-tag size="small" effect="plain">{{ report.skill }}</el-tag>
+      <span style="font-size:11px;color:var(--text-muted,#555);margin-left:4px">{{ formatTime(report.timestamp) }}</span>
+    </div>
 
     <!-- 统计卡片 -->
     <div class="stat-row">
@@ -77,7 +75,7 @@
         </div>
       </el-collapse-item>
     </el-collapse>
-  </el-card>
+  </div>
 </template>
 
 <script setup lang="ts">
@@ -246,6 +244,29 @@ watch(() => props.report, async () => { await nextTick(); initCharts() })
 </script>
 
 <style scoped>
+/* ── Dashboard wrapper ── */
+.result-dashboard {
+  /* fills zone-c which already has padding */
+}
+
+.dashboard-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 14px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border-card);
+}
+
+.dashboard-title {
+  font-family: var(--font-ui);
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  color: var(--accent-cyan);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
 /* ── 统计卡片 ── */
 .stat-row {
   display: flex;

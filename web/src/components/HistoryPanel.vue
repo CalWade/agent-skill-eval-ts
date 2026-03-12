@@ -1,6 +1,5 @@
 <template>
-  <el-card>
-    <template #header>历史报告</template>
+  <div class="history-panel">
     <div v-if="reports.length === 0" class="empty-state">
       NO HISTORY
     </div>
@@ -15,7 +14,7 @@
         <div class="report-name">{{ file }}</div>
       </div>
     </div>
-  </el-card>
+  </div>
 </template>
 
 <script setup lang="ts">
@@ -44,6 +43,10 @@ async function load(file: string) {
 </script>
 
 <style scoped>
+.history-panel {
+  padding: 0;
+}
+
 .empty-state {
   font-family: var(--font-mono, monospace);
   font-size: var(--fs-sm, 12px);
