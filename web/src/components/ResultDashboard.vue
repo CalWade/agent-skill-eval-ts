@@ -397,35 +397,4 @@ watch(() => props.report, async () => { await nextTick(); initCharts() })
 }
 </style>
 
-<!-- Element Plus 表格全局覆盖（非 scoped） -->
-<style>
-.el-table {
-  --el-table-bg-color: var(--bg-table-row, #1a1d27);
-  --el-table-tr-bg-color: var(--bg-table-row, #1a1d27);
-  --el-table-header-bg-color: var(--bg-card, #0f1117);
-  --el-table-border-color: var(--border-base, rgba(255,255,255,0.08));
-  --el-table-text-color: var(--text-primary, #ccc);
-  --el-table-header-text-color: var(--text-secondary, #888);
-}
-.el-table .el-table__header th {
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  font-size: var(--fs-xs, 11px);
-  background: var(--bg-card, #0f1117) !important;
-  color: var(--text-secondary, #888) !important;
-  border-bottom: 1px solid var(--border-base, rgba(255,255,255,0.08));
-}
-.el-table .el-table__row:nth-child(even) td {
-  background: var(--bg-table-row-alt, rgba(255,255,255,0.025)) !important;
-}
-.el-table .el-table__row:hover td {
-  background: rgba(0,200,212,0.05) !important;
-}
-.el-table .row-fail td {
-  background: rgba(224,74,74,0.06) !important;
-}
-.el-table td,
-.el-table th {
-  border-bottom: 1px solid var(--border-base, rgba(255,255,255,0.08)) !important;
-}
-</style>
+
