@@ -151,13 +151,17 @@ async function main(): Promise<void> {
   const intervalMs = args.intervalMs ?? appConfig.intervalMs;
   const results = await runAll(models, cases, {
     agent: {
+      mode: appConfig.mode,
       apiUrl: appConfig.agentApiUrl,
       apiKey: appConfig.agentApiKey,
       extraBody: appConfig.agentExtraBody,
+      localBaseUrl: appConfig.localBaseUrl,
+      localToken: appConfig.localToken,
       timeoutMs: appConfig.timeoutMs,
     },
     intervalMs,
     switchWaitMs: appConfig.switchWaitMs,
+    runId: Date.now().toString(36),
   });
 
   // 构建报告

@@ -59,15 +59,15 @@
   </el-card>
 
   <!-- 模型列表编辑对话框 -->
-  <el-dialog v-model="modelDialogVisible" title="编辑模型列表" width="400px" align-center>
+  <el-dialog v-model="modelDialogVisible" title="编辑模型列表" width="500px" align-center>
     <div class="dialog-inner">
       <div style="margin-bottom:14px">
         <div class="dialog-hint">
-          切换指令前缀（实际发送：前缀 + 空格 + 模型名）
+          Cloud 模式切换指令前缀（实际发送：前缀 + 空格 + 模型名）
         </div>
         <el-input v-model="editingPrefix" size="small" placeholder="/model" />
       </div>
-      <div class="dialog-hint" style="margin-bottom:6px">模型名列表</div>
+      <div class="dialog-hint" style="margin-bottom:6px">模型列表</div>
       <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:10px">
         <div
           v-for="(_, idx) in editingIds"
@@ -75,12 +75,25 @@
           style="display:flex;align-items:center;gap:6px"
         >
           <span class="dialog-index">{{ idx + 1 }}</span>
-          <el-input v-model="editingIds[idx]" size="small" :placeholder="`模型名，如 gpt-4o`" style="flex:1" />
-          <span class="dialog-preview">
-            → {{ editingPrefix }} {{ editingIds[idx] || '...' }}
-          </span>
+          <el-input
+            v-model="editingIds[idx]"
+            size="small"
+            placeholder="模型名，如 gpt-4o"
+            style="flex:1"
+          />
+          <el-input
+            v-model="editingLocalModels[editingIds[idx] ?? '']"
+            size="small"
+            placeholder="Local: providerId/modelId"
+            style="flex:1.2"
+            class="input-mono"
+          />
           <el-button size="small" text type="danger" @click="removeModel(idx)">×</el-button>
         </div>
+      </div>
+      <div class="dialog-hint" style="margin-bottom:10px">
+        Local 模式填写 OpenClaw 的 provider/modelId，如
+        <code>custom-dashscope/qwen3.5-plus</code>，留空则不参与 local 测试。
       </div>
       <el-button size="small" plain style="width:100%;margin-bottom:4px" @click="addModel">
         + 添加模型
@@ -174,12 +187,14 @@ async function saveSuiteToServer() {
 const modelDialogVisible = ref(false)
 const editingPrefix = ref('/model')
 const editingIds = ref<string[]>([])
+const editingLocalModels = ref<Record<string, string>>({})
 const savingModels = ref(false)
 
 async function openModelEditor() {
   const resp = await getModels()
   editingPrefix.value = resp.prefix
   editingIds.value = [...resp.ids]
+  editingLocalModels.value = { ...resp.localModels }
   modelDialogVisible.value = true
 }
 
@@ -203,7 +218,7 @@ async function confirmModelEdit() {
   }
   savingModels.value = true
   try {
-    await saveModels(editingPrefix.value.trim(), validIds)
+    await saveModels(editingPrefix.value.trim(), validIds, editingLocalModels.value)
     const resp = await getModels()
     models.value = resp.models
     const idSet = new Set(validIds)
@@ -284,6 +299,17 @@ async function confirmModelEdit() {
   color: var(--text-muted, #444);
   font-family: var(--font-mono, monospace);
   flex-shrink: 0;
+}
+.input-mono :deep(.el-input__inner) {
+  font-family: var(--font-mono, monospace);
+  font-size: 11px;
+}
+code {
+  font-family: var(--font-mono, monospace);
+  font-size: 11px;
+  background: var(--bg-card, #1a1d2e);
+  padding: 1px 4px;
+  border-radius: 3px;
 }
 </style>
 

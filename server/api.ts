@@ -43,12 +43,18 @@ app.use(express.json());
 app.get('/api/config', (_req, res) => {
   const env = readEnvFile();
   res.json({
+    agentMode:        env['AGENT_MODE'] ?? 'cloud',
+    // cloud
     agentApiUrl:      env['AGENT_API_URL'] ?? '',
     agentApiKey:      env['AGENT_API_KEY'] ?? '',
     agentInstanceId:  env['AGENT_INSTANCE_ID'] ?? '',
     agentExtraBody:   env['AGENT_EXTRA_BODY'] ?? '',
-    requestInterval:  env['REQUEST_INTERVAL'] ?? '3',
     switchWait:       env['SWITCH_WAIT'] ?? '2',
+    // local
+    localBaseUrl:     env['LOCAL_BASE_URL'] ?? 'http://127.0.0.1:18789',
+    localToken:       env['LOCAL_TOKEN'] ?? '',
+    // 通用
+    requestInterval:  env['REQUEST_INTERVAL'] ?? '3',
     requestTimeout:   env['REQUEST_TIMEOUT'] ?? '60',
   });
 });
@@ -57,14 +63,24 @@ app.get('/api/config', (_req, res) => {
 
 app.post('/api/config', (req, res) => {
   const body = req.body as Record<string, string>;
+  // 前端发什么就写什么，writeEnvFile 会与现有配置合并
+  // 用显式映射避免前端字段名污染 .env
+  const fieldMap: Record<string, string> = {
+    agentMode:       'AGENT_MODE',
+    agentApiUrl:     'AGENT_API_URL',
+    agentApiKey:     'AGENT_API_KEY',
+    agentInstanceId: 'AGENT_INSTANCE_ID',
+    agentExtraBody:  'AGENT_EXTRA_BODY',
+    switchWait:      'SWITCH_WAIT',
+    localBaseUrl:    'LOCAL_BASE_URL',
+    localToken:      'LOCAL_TOKEN',
+    requestInterval: 'REQUEST_INTERVAL',
+    requestTimeout:  'REQUEST_TIMEOUT',
+  };
   const env: Record<string, string> = {};
-  if (body['agentApiUrl'])     env['AGENT_API_URL'] = body['agentApiUrl'];
-  if (body['agentApiKey'])     env['AGENT_API_KEY'] = body['agentApiKey'];
-  if (body['agentInstanceId']) env['AGENT_INSTANCE_ID'] = body['agentInstanceId'];
-  if (body['agentExtraBody'])  env['AGENT_EXTRA_BODY'] = body['agentExtraBody'];
-  if (body['requestInterval']) env['REQUEST_INTERVAL'] = body['requestInterval'];
-  if (body['switchWait'])      env['SWITCH_WAIT'] = body['switchWait'];
-  if (body['requestTimeout'])  env['REQUEST_TIMEOUT'] = body['requestTimeout'];
+  for (const [frontendKey, envKey] of Object.entries(fieldMap)) {
+    if (frontendKey in body) env[envKey] = body[frontendKey] ?? '';
+  }
   writeEnvFile(env);
   res.json({ ok: true });
 });
@@ -73,18 +89,22 @@ app.post('/api/config', (req, res) => {
 
 app.get('/api/models', (_req, res) => {
   const file = readModelsFile();
-  res.json({ models: getModels(), prefix: file.prefix, ids: file.ids });
+  res.json({ models: getModels(), prefix: file.prefix, ids: file.ids, localModels: file.localModels ?? {} });
 });
 
 // ── POST /api/models ──────────────────────────────────────────
 
 app.post('/api/models', (req, res) => {
-  const { prefix, ids } = req.body as { prefix: string; ids: string[] };
+  const { prefix, ids, localModels } = req.body as {
+    prefix: string;
+    ids: string[];
+    localModels?: Record<string, string>;
+  };
   if (!prefix || !Array.isArray(ids)) {
     res.status(400).json({ error: '格式错误，需要 prefix 和 ids 数组' });
     return;
   }
-  saveModelsFile({ prefix, ids });
+  saveModelsFile({ prefix, ids, localModels });
   res.json({ ok: true });
 });
 
@@ -173,13 +193,17 @@ app.post('/api/run', async (req, res) => {
     suite.cases,
     {
       agent: {
+        mode: config.mode,
         apiUrl: config.agentApiUrl,
         apiKey: config.agentApiKey,
         extraBody: config.agentExtraBody,
+        localBaseUrl: config.localBaseUrl,
+        localToken: config.localToken,
         timeoutMs: config.timeoutMs,
       },
       intervalMs: config.intervalMs,
       switchWaitMs: config.switchWaitMs,
+      runId: Date.now().toString(36),
     },
     {
       onModelStart: (modelId, index, total) => send('model_start', { modelId, index, total }),

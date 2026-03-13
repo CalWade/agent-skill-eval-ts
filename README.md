@@ -8,11 +8,11 @@ AI Agent Skill 多模型评测平台（TypeScript + Vue 3）。
 
 - **可视化操作** — Vue 3 深色主题界面，无需手动编辑任何文件
 - **多模型横向对比** — 自动依次切换模型，同一套用例跑多个模型，结果并排展示
-- **模型切换即指令** — 通过平台内置指令（如 `/model gpt-4o`）切换，一个 API Key 搞定所有模型
+- **双模式运行** — Cloud 模式通过发指令切换模型；Local 模式对接本地 OpenClaw gateway，每个用例独立 sessionKey，上下文完全隔离
 - **实时日志流** — 测试过程 SSE 推流，逐条显示回复，无需等待全部完成
 - **可视化汇总大屏** — 通过率图表、耗时图表、用例对比表、回复详情折叠展示
 - **用例可视化编辑** — 界面增删改用例及判定条件，保存写回 YAML 文件
-- **模型列表可编辑** — 界面上管理模型名称和切换指令前缀，持久化到 `models.json`
+- **模型列表可编辑** — 界面上管理模型名称、切换指令前缀和 Local 模型 ID，持久化到 `models.json`
 - **历史报告** — 每次测试自动保存 JSON 报告，历史 Tab 随时查看
 
 ## 快速开始
@@ -21,12 +21,12 @@ AI Agent Skill 多模型评测平台（TypeScript + Vue 3）。
 pnpm install
 cd web && pnpm install && cd ..
 
-cp .env.example .env   # 填入 AGENT_API_URL 和 AGENT_API_KEY
+cp .env.example .env   # 按需填写，也可直接在界面上配置
 
 pnpm dev               # 同时启动后端（:3001）和前端（:5173）
 ```
 
-浏览器打开 `http://localhost:5173`。
+浏览器打开 `http://localhost:5173`，在界面上选择运行模式并保存配置后即可使用。
 
 ## 项目结构
 
@@ -36,18 +36,21 @@ agent-skill-eval/
 │   ├── api.ts                Express 服务器，所有 REST / SSE 端点
 │   ├── types.ts              核心类型定义（Single Source of Truth）
 │   ├── models.ts             硬编码默认模型列表（fallback）
-│   ├── config.ts             从 .env 加载运行配置
-│   ├── agent.ts              单次 HTTP 调用 Agent API，含超时和计时
+│   ├── agent.ts              Agent API 调用，支持 cloud / local 双模式
 │   ├── judge.ts              判定引擎，三种文本匹配类型
-│   ├── runner.ts             多模型串行执行器（CLI 模式）
-│   └── cli.ts                CLI 入口（可选）
+│   ├── runner.ts             CLI 模式执行适配层
+│   ├── report.ts             CLI 模式控制台输出 + Markdown 报告生成
+│   ├── cli.ts                CLI 入口
+│   └── services/
+│       ├── configService.ts  .env 读写 + 运行时配置加载
+│       ├── modelService.ts   models.json 读写 + 模型列表管理
+│       └── runService.ts     测试执行核心引擎（SSE 和 CLI 共用）
 ├── web/                      前端（Vue 3 + Vite + Element Plus）
 │   └── src/
-│       ├── App.vue           根组件，整体布局 + SSE 事件处理 + 日志聚合
 │       ├── api/index.ts      前端 API 封装（REST + SSE 读流）
 │       ├── types/index.ts    前端类型定义（与 server/types.ts 对应）
 │       └── components/
-│           ├── ConfigPanel.vue      API 配置表单，读写 .env
+│           ├── ConfigPanel.vue      API 配置表单，支持 Cloud / Local 模式切换
 │           ├── SuitePanel.vue       模型勾选 + 用例管理 + 开始测试按钮
 │           ├── LiveLog.vue          实时滚动日志（仿控制台风格）
 │           ├── ResultDashboard.vue  汇总大屏（图表 + 对比表 + 回复详情）
@@ -59,42 +62,67 @@ agent-skill-eval/
 │       └── smoke.yaml
 ├── results/                  历史报告 JSON（自动生成，不入库）
 ├── models.json               用户自定义模型列表（界面保存后生成，优先于硬编码）
-└── .env                      API 连接配置（不入库）
+└── .env                      运行配置（不入库）
 ```
 
 ## 配置（.env）
 
+所有配置均可在界面上操作保存，无需手动编辑此文件。
+
 ```bash
-# Agent API 唯一入口（所有模型共用同一端点）
-AGENT_API_URL=https://your-instance.openclaw.ai/v1/chat/completions
+# ── 运行模式 ──────────────────────────────────────────────────
+AGENT_MODE=cloud          # cloud（默认）| local
+
+# ── Cloud 模式（AGENT_MODE=cloud）────────────────────────────
+AGENT_API_URL=https://your-platform.example.com/v1/chat/completions
 AGENT_API_KEY=your-key
+AGENT_INSTANCE_ID=        # 平台特有参数，有则填（作为 extra_body 传入）
+SWITCH_WAIT=2             # 切换模型后等待秒数
 
-# 平台特有参数（如有，作为 extra_body 传入）
-AGENT_INSTANCE_ID=your-instance-id
+# ── Local 模式（AGENT_MODE=local）────────────────────────────
+LOCAL_BASE_URL=http://127.0.0.1:18789   # OpenClaw gateway 地址
+LOCAL_TOKEN=your-gateway-token          # gateway.auth.token
 
-# 运行参数（均可在界面上修改，保存后写回此文件）
-REQUEST_INTERVAL=3     # 用例间等待秒数（防限频）
-SWITCH_WAIT=2          # 切换模型后等待秒数
-REQUEST_TIMEOUT=60     # 单次请求超时秒数
+# ── 通用 ──────────────────────────────────────────────────────
+REQUEST_INTERVAL=3        # 用例间等待秒数（防限频）
+REQUEST_TIMEOUT=60        # 单次请求超时秒数
 ```
+
+## 运行模式说明
+
+### Cloud 模式
+
+适用于云端 OpenAI 兼容 API。多模型切换通过向 Agent 发送 `switchCmd` 消息（如 `/model gpt-4o`）实现，所有模型共用同一 API 端点和 Key。
+
+### Local 模式（OpenClaw Gateway）
+
+适用于本地 OpenClaw 实例。需要先在 OpenClaw 配置中启用 chatCompletions 端点：
+
+```json
+// ~/.openclaw/openclaw.json
+{
+  "gateway": {
+    "http": {
+      "endpoints": {
+        "chatCompletions": { "enabled": true }
+      }
+    }
+  }
+}
+```
+
+**上下文隔离**：每个用例调用时携带独立的 `x-openclaw-session-key`，格式为 `eval:{runId}:{modelId}:{caseId}`，保证模型间、用例间、测试批次间上下文完全隔离。
+
+**模型切换**：通过请求体 `model` 字段指定 OpenClaw 中配置的 provider/model，不再发切换消息。
 
 ## 模型管理
 
-**默认列表**（`server/models.ts`，代码级 fallback）：
+点击界面「编辑列表」管理模型：
 
-```typescript
-{ id: 'gpt-4o',            switchCmd: '/model gpt-4o' },
-{ id: 'gpt-4o-mini',       switchCmd: '/model gpt-4o-mini' },
-{ id: 'deepseek-v3',       switchCmd: '/model deepseek-v3' },
-{ id: 'deepseek-r1',       switchCmd: '/model deepseek-r1' },
-{ id: 'kimi-k2',           switchCmd: '/model kimi-k2' },
-{ id: 'claude-3-5-sonnet', switchCmd: '/model claude-3-5-sonnet' },
-```
+- **Cloud 模式**：配置切换指令前缀（默认 `/model`）和模型名列表
+- **Local 模式**：额外填写每个模型对应的 OpenClaw `providerId/modelId`，如 `custom-dashscope/qwen3.5-plus`
 
-**界面编辑**：点击「选择模型」旁的「编辑列表」，可以：
-- 修改切换指令前缀（默认 `/model`，统一作用于所有模型）
-- 增删模型名称，右侧实时预览拼接后的完整指令
-- 保存后写入 `models.json`，下次启动自动读取，优先于硬编码默认值
+配置保存到 `models.json`，优先于代码内硬编码的默认列表。
 
 ## 测试用例格式
 
@@ -137,9 +165,9 @@ cases:
 
 | 方法 | 路径 | 说明 |
 |------|------|------|
-| GET | `/api/config` | 读取当前 .env 配置 |
-| POST | `/api/config` | 保存配置到 .env |
-| GET | `/api/models` | 返回模型列表及前缀信息 |
+| GET | `/api/config` | 读取当前配置（含运行模式） |
+| POST | `/api/config` | 保存配置（合并写入 .env） |
+| GET | `/api/models` | 返回模型列表、前缀、local 映射 |
 | POST | `/api/models` | 保存模型列表到 models.json |
 | GET | `/api/suites` | 列出 examples/ 下所有 YAML 文件 |
 | GET | `/api/suite?file=xxx` | 读取单个套件内容 |
@@ -150,7 +178,7 @@ cases:
 
 ## CLI 模式（可选）
 
-不启动界面，直接命令行跑：
+不启动界面，直接命令行跑。CLI 模式只支持 cloud 模式。
 
 ```bash
 pnpm smoke              # 跑示例冒烟测试（所有模型）
@@ -166,7 +194,7 @@ pnpm eval --suite examples/feishu/smoke.yaml --safe-only --interval 5
 
 ```bash
 pnpm typecheck                        # 后端 TypeScript
-cd web && pnpm vue-tsc --noEmit       # 前端 Vue + TypeScript
+cd web && npx vue-tsc --noEmit        # 前端 Vue + TypeScript
 ```
 
 ## License

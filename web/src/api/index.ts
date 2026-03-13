@@ -24,9 +24,9 @@ export const saveConfig = (data: Record<string, string>) => post<{ ok: boolean }
 
 // 模型
 export const getModels = () =>
-  get<{ models: ModelConfig[]; prefix: string; ids: string[] }>('/models')
-export const saveModels = (prefix: string, ids: string[]) =>
-  post<{ ok: boolean }>('/models', { prefix, ids })
+  get<{ models: ModelConfig[]; prefix: string; ids: string[]; localModels: Record<string, string> }>('/models')
+export const saveModels = (prefix: string, ids: string[], localModels?: Record<string, string>) =>
+  post<{ ok: boolean }>('/models', { prefix, ids, localModels })
 
 // 测试套件
 export const getSuites = () => get<string[]>('/suites')

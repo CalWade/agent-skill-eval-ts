@@ -22,9 +22,12 @@ export interface TestSuite {
   cases: TestCase[]
 }
 
+export type AgentMode = 'cloud' | 'local'
+
 export interface ModelConfig {
   id: string
   switchCmd: string
+  localModelId?: string
 }
 
 export interface CallResult {

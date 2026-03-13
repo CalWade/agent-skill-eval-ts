@@ -17,6 +17,11 @@ const MODELS_PATH = join(resolve(__dirname, '../..'), 'models.json');
 export interface ModelsFile {
   prefix: string;
   ids: string[];
+  /**
+   * local 模式专用：id → OpenClaw model 字段值的映射
+   * 格式 "providerId/modelId"，如 "custom-coding-dashscope-aliyuncs-com/qwen3.5-plus"
+   */
+  localModels?: Record<string, string>;
 }
 
 const DEFAULT_PREFIX = '/model';
@@ -36,7 +41,11 @@ export function getModels(): ModelConfig[] {
   if (existsSync(MODELS_PATH)) {
     try {
       const file = JSON.parse(readFileSync(MODELS_PATH, 'utf-8')) as ModelsFile;
-      return file.ids.map((id) => ({ id, switchCmd: `${file.prefix} ${id}` }));
+      return file.ids.map((id) => ({
+        id,
+        switchCmd: `${file.prefix} ${id}`,
+        localModelId: file.localModels?.[id],
+      }));
     } catch { /* 解析失败则回退 */ }
   }
   return DEFAULT_MODELS;
@@ -53,9 +62,19 @@ export function filterModels(ids: string[]): ModelConfig[] {
 
 /** 保存模型列表到 models.json */
 export function saveModelsFile(file: ModelsFile): void {
+  const cleanIds = file.ids.map((id) => id.trim()).filter(Boolean);
   const clean: ModelsFile = {
     prefix: file.prefix.trim(),
-    ids: file.ids.map((id) => id.trim()).filter(Boolean),
+    ids: cleanIds,
   };
+  // 只保留有效 id 对应的 localModels 条目
+  if (file.localModels) {
+    const localModels: Record<string, string> = {};
+    for (const id of cleanIds) {
+      const v = file.localModels[id]?.trim();
+      if (v) localModels[id] = v;
+    }
+    if (Object.keys(localModels).length > 0) clean.localModels = localModels;
+  }
   writeFileSync(MODELS_PATH, JSON.stringify(clean, null, 2), 'utf-8');
 }

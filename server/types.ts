@@ -2,18 +2,29 @@
  * 核心类型定义
  */
 
+// ── 运行模式 ──────────────────────────────────────────────────
+
+/**
+ * cloud: 通过 OpenAI 兼容 API 测试，发送 switchCmd 消息切换模型
+ * local: 通过本地 OpenClaw gateway 测试，用 model 字段 + sessionKey 隔离
+ */
+export type AgentMode = 'cloud' | 'local';
+
 // ── 模型配置 ──────────────────────────────────────────────────
 
 /**
- * 平台内置模型配置。
- * 切换方式：向 Agent 发送 switchCmd 文本（如 "/model gpt-4o"），
- * 平台在同一 API 端点内完成模型切换，无需独立 API Key。
+ * 模型配置，云端和本地模式共用。
+ *
+ * cloud 模式：switchCmd 必填，通过发消息切换模型
+ * local 模式：localModelId 必填（格式 "providerId/modelId"），switchCmd 忽略
  */
 export interface ModelConfig {
   /** 唯一标识，CLI --models 过滤用 */
   id: string;
-  /** 切换指令原文，直接作为 user message 发送 */
+  /** cloud 模式：切换指令原文，直接作为 user message 发送 */
   switchCmd: string;
+  /** local 模式：OpenClaw model 字段值，格式 "providerId/modelId" */
+  localModelId?: string;
 }
 
 // ── YAML 测试用例 ─────────────────────────────────────────────
