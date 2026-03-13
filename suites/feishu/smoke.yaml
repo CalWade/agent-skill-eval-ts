@@ -1,4 +1,4 @@
-description: 冒烟测试
+description: 飞书冒烟测试 — 自动保存测试
 cases:
   - instruction: 你好，我正在本地测试
   - instruction: 帮我查天气

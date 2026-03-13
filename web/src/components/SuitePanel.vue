@@ -46,19 +46,18 @@
     </div>
 
     <!-- 套件信息 -->
-    <el-form size="small" label-position="top" style="margin-bottom:8px">
-      <el-form-item label="描述（可选）">
+    <el-form size="small" label-position="top" style="margin-bottom:4px">
+      <el-form-item label="描述（可选）" style="margin-bottom:0">
         <el-input v-model="suite.description" placeholder="..." />
       </el-form-item>
     </el-form>
 
-    <el-button
-      size="small"
-      style="width:100%;margin-top:2px"
-      @click="saveSuiteToServer"
-      :loading="saving"
-      :disabled="!selectedFile || suite.cases.length === 0"
-    >保存套件</el-button>
+    <!-- 自动保存状态 -->
+    <div v-if="selectedFile" class="save-status">
+      <span v-if="saving" class="save-state saving">保存中…</span>
+      <span v-else-if="saveError" class="save-state error">保存失败</span>
+      <span v-else class="save-state saved">已自动保存</span>
+    </div>
   </el-card>
 
   <!-- 新建 / 重命名文件对话框 -->
@@ -163,12 +162,38 @@ const selectedModelIds = ref<string[]>([])
 const suiteFiles = ref<string[]>([])
 const selectedFile = ref('')
 const saving = ref(false)
+const saveError = ref(false)
 
 function emitPayload() {
   emit('run', { modelIds: selectedModelIds.value, suite: { ...suite } })
 }
 
 watch([selectedModelIds, () => suite.cases.length], emitPayload, { deep: true })
+
+// 自动保存：suite 内容变化后 debounce 500ms 写入
+let saveTimer: ReturnType<typeof setTimeout> | null = null
+watch(
+  suite,
+  () => {
+    if (!selectedFile.value) return
+    if (saveTimer) clearTimeout(saveTimer)
+    saveTimer = setTimeout(autoSave, 500)
+  },
+  { deep: true },
+)
+
+async function autoSave() {
+  if (!selectedFile.value) return
+  saving.value = true
+  saveError.value = false
+  try {
+    await saveSuite(selectedFile.value, { ...suite })
+  } catch {
+    saveError.value = true
+  } finally {
+    saving.value = false
+  }
+}
 
 onMounted(async () => {
   const resp = await getModels()
@@ -194,19 +219,7 @@ async function loadSuite() {
   }
 }
 
-async function saveSuiteToServer() {
-  if (!selectedFile.value) return
-  saving.value = true
-  try {
-    await saveSuite(selectedFile.value, { ...suite })
-    suiteFiles.value = await getSuites()
-    ElMessage.success('套件已保存')
-  } catch (e) {
-    ElMessage.error(String(e))
-  } finally {
-    saving.value = false
-  }
-}
+
 
 // ── 新建 / 重命名 文件对话框 ───────────────────────────────────
 const fileDialogVisible = ref(false)
@@ -234,7 +247,6 @@ async function confirmFileDialog() {
       await saveSuite(newFile, { ...suite })
       suiteFiles.value = await getSuites()
       selectedFile.value = newFile
-      ElMessage.success(`已保存为 ${newFile}`)
     } catch (e) {
       ElMessage.error(String(e))
     } finally {
@@ -381,6 +393,19 @@ async function confirmModelEdit() {
   font-family: var(--font-mono, monospace);
   font-size: 11px;
 }
+.save-status {
+  display: flex;
+  justify-content: flex-end;
+  padding: 2px 0 4px;
+}
+.save-state {
+  font-size: 11px;
+  letter-spacing: 0.03em;
+}
+.save-state.saving { color: var(--text-muted, #666); }
+.save-state.saved   { color: var(--text-muted, #555); }
+.save-state.error   { color: var(--status-fail, #f56c6c); }
+
 .file-path {
   font-family: var(--font-mono, monospace);
   font-size: 11px;
