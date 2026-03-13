@@ -437,40 +437,40 @@ code {
 <style>
 .save-toast {
   position: fixed;
-  bottom: 28px;
+  top: 64px;
   left: 50%;
   transform: translateX(-50%);
   background: #1a1d2e;
   border: 1px solid rgba(0, 200, 212, 0.35);
-  border-radius: 20px;
-  padding: 6px 16px 6px 12px;
-  font-size: 12px;
+  border-radius: 24px;
+  padding: 10px 22px 10px 16px;
+  font-size: 14px;
   color: #00c8d4;
   display: flex;
   align-items: center;
-  gap: 7px;
-  box-shadow: 0 6px 20px rgba(0,0,0,0.5), 0 0 0 1px rgba(0,200,212,0.06);
+  gap: 9px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.5), 0 0 0 1px rgba(0,200,212,0.06);
   pointer-events: none;
   z-index: 9999;
   white-space: nowrap;
-  letter-spacing: 0.02em;
+  letter-spacing: 0.03em;
 }
 .save-toast-icon {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 16px;
-  height: 16px;
+  width: 20px;
+  height: 20px;
   background: rgba(0, 200, 212, 0.15);
   border-radius: 50%;
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 700;
   flex-shrink: 0;
 }
 .save-toast-enter-active { transition: opacity 0.18s ease, transform 0.18s ease; }
 .save-toast-leave-active { transition: opacity 0.22s ease, transform 0.22s ease; }
-.save-toast-enter-from   { opacity: 0; transform: translateX(-50%) translateY(10px); }
-.save-toast-leave-to     { opacity: 0; transform: translateX(-50%) translateY(5px); }
+.save-toast-enter-from   { opacity: 0; transform: translateX(-50%) translateY(-8px); }
+.save-toast-leave-to     { opacity: 0; transform: translateX(-50%) translateY(-4px); }
 </style>
 
 
