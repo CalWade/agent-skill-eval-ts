@@ -22,6 +22,10 @@ async function post<T>(path: string, body: unknown): Promise<T> {
 export const getConfig = () => get<Record<string, string>>('/config')
 export const saveConfig = (data: Record<string, string>) => post<{ ok: boolean }>('/config', data)
 
+// OpenClaw 本地可用模型（从 openclaw.json 读取）
+export const getLocalModels = () =>
+  get<{ id: string; name: string }[]>('/localModels')
+
 // 模型
 export const getModels = () =>
   get<{ models: ModelConfig[]; prefix: string; ids: string[]; localModels: Record<string, string> }>('/models')

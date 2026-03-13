@@ -12,7 +12,18 @@
 
 import { callAgent, type AgentConfig } from '../agent.js';
 import { judge } from '../judge.js';
+import { getDefaultModel, switchModel, backupWorkspace, restoreWorkspace, resetFromBackup } from './openclawService.js';
 import type { ModelConfig, TestCase, TestSuite, CaseModelResult, EvalReport } from '../types.js';
+
+function localTimeStr() {
+  const d = new Date();
+  const pad = (n: number, len = 2) => String(n).padStart(len, '0');
+  return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}.${pad(d.getMilliseconds(), 3)}`;
+}
+
+function log(msg: string) {
+  console.log(`[run][${localTimeStr()}] ${msg}`);
+}
 
 export interface RunConfig {
   agent: AgentConfig;
@@ -67,19 +78,80 @@ export async function executeRun(
   const isLocal = config.agent.mode === 'local';
   const runId = config.runId ?? Date.now().toString(36);
 
+  log(`executeRun start  mode=${isLocal ? 'local' : 'cloud'}  models=${models.length}  cases=${cases.length}  runId=${runId}`);
+
+  // local 模式：记录初始默认模型，测试结束后恢复
+  let originalModel = '';
+  if (isLocal) {
+    try {
+      originalModel = await getDefaultModel();
+      log(`original model: ${originalModel}`);
+    } catch (err) {
+      log(`warn: failed to read current model: ${(err as Error).message}`);
+    }
+  }
+
+  // 第一个模型开始前备份一次 workspace（作为所有模型还原的基准）
+  let initialBackupDir = '';
+  if (isLocal) {
+    try {
+      initialBackupDir = backupWorkspace(`${runId}-init`);
+      log(`initial workspace backed up`);
+    } catch (err) {
+      log(`warn: workspace backup failed: ${(err as Error).message}`);
+    }
+  }
+
+  try {
   for (let mi = 0; mi < models.length; mi++) {
     const model = models[mi];
+    log(`model [${mi + 1}/${models.length}] ${model.id}`);
     callbacks.onModelStart?.(model.id, mi, models.length);
 
     if (isLocal) {
-      // local 模式：无需切换，直接运行用例
-      callbacks.onSwitchOk?.(model.id, 0);
+      // 每个模型测试前还原到初始 workspace 快照（所有模型从同一起点出发）
+      if (initialBackupDir) {
+        try {
+          resetFromBackup(initialBackupDir);
+          log(`workspace reset for model [${mi + 1}/${models.length}]`);
+        } catch (err) {
+          log(`warn: workspace reset failed: ${(err as Error).message}`);
+        }
+      }
+
+      // 切换 OpenClaw 默认模型
+      if (model.id.includes('/')) {
+        const switchStart = Date.now();
+        try {
+          await switchModel(model.id);
+          callbacks.onSwitchOk?.(model.id, Date.now() - switchStart);
+        } catch (err) {
+          const msg = (err as Error).message;
+          log(`model ${model.id}: switch FAILED: ${msg}`);
+          callbacks.onSwitchFail?.(model.id, msg);
+          for (const c of cases) {
+            const r: CaseModelResult = {
+              caseId: c.id, caseTitle: c.title, modelId: model.id,
+              call: { success: false, output: '', durationMs: 0, promptTokens: null, completionTokens: null, totalTokens: null, finishReason: 'error', error: msg },
+              verdict: 'FAIL', failReasons: [`模型切换失败: ${msg}`],
+            };
+            allResults.push(r);
+            callbacks.onCaseResult?.(r);
+          }
+          continue;
+        }
+      } else {
+        log(`model ${model.id}: no provider/modelId format, using current default`);
+        callbacks.onSwitchOk?.(model.id, 0);
+      }
     } else {
       // cloud 模式：发送 switchCmd 消息切换模型
+      log(`model ${model.id}: sending switchCmd: ${model.switchCmd}`);
       callbacks.onSwitch?.(model.id, model.switchCmd);
       const switchResult = await callAgent(model.switchCmd, config.agent);
 
       if (!switchResult.success) {
+        log(`model ${model.id}: switchCmd FAILED: ${switchResult.error}`);
         callbacks.onSwitchFail?.(model.id, switchResult.error ?? '未知错误');
         for (const c of cases) {
           const r: CaseModelResult = {
@@ -93,25 +165,25 @@ export async function executeRun(
         continue;
       }
 
+      log(`model ${model.id}: switchCmd OK (${switchResult.durationMs}ms), waiting ${config.switchWaitMs}ms`);
       callbacks.onSwitchOk?.(model.id, switchResult.durationMs);
       if (config.switchWaitMs > 0) await sleep(config.switchWaitMs);
     }
 
     for (let ci = 0; ci < cases.length; ci++) {
       const c = cases[ci];
+      log(`  case [${ci + 1}/${cases.length}] id=${c.id}  "${c.title}"`);
       callbacks.onCaseStart?.(model.id, c.id, c.title, ci, cases.length);
 
-      // local 模式：每次调用注入独立 sessionKey + localModelId
+      // local 模式：注入独立 sessionKey
       const agentConfig = isLocal
-        ? {
-            ...config.agent,
-            localModelId: model.localModelId,
-            sessionKey: `eval:${runId}:${model.id}:${c.id}`,
-          }
+        ? { ...config.agent, sessionKey: `eval:${runId}:${model.id}:${c.id}` }
         : config.agent;
 
       const callResult = await callAgent(c.instruction, agentConfig);
       const { verdict, failReasons } = judge(callResult.output, c.pass_criteria);
+
+      log(`  case ${c.id}: verdict=${verdict}  duration=${callResult.durationMs}ms${!callResult.success ? `  error=${callResult.error}` : ''}${failReasons.length ? `  failReasons=${JSON.stringify(failReasons)}` : ''}`);
 
       const r: CaseModelResult = {
         caseId: c.id, caseTitle: c.title, modelId: model.id,
@@ -120,11 +192,43 @@ export async function executeRun(
       allResults.push(r);
       callbacks.onCaseResult?.(r);
 
-      if (ci < cases.length - 1 && config.intervalMs > 0) await sleep(config.intervalMs);
+      if (ci < cases.length - 1 && config.intervalMs > 0) {
+        log(`  waiting intervalMs=${config.intervalMs}ms before next case`);
+        await sleep(config.intervalMs);
+      }
     }
 
+    log(`model ${model.id}: done`);
     callbacks.onModelDone?.(model.id);
-    if (mi < models.length - 1 && config.intervalMs > 0) await sleep(config.intervalMs);
+    if (mi < models.length - 1 && config.intervalMs > 0) {
+      log(`waiting intervalMs=${config.intervalMs}ms before next model`);
+      await sleep(config.intervalMs);
+    }
+  }
+
+  log(`executeRun done  total results=${allResults.length}`);
+
+  } finally {
+    if (isLocal) {
+      // 恢复原始默认模型
+      if (originalModel) {
+        try {
+          await switchModel(originalModel);
+          log(`restored model to ${originalModel}`);
+        } catch (err) {
+          log(`warn: failed to restore model: ${(err as Error).message}`);
+        }
+      }
+      // 还原 workspace 到测试前状态，并清理备份
+      if (initialBackupDir) {
+        try {
+          restoreWorkspace(initialBackupDir);
+          log(`workspace restored to pre-test state`);
+        } catch (err) {
+          log(`warn: workspace restore failed: ${(err as Error).message}`);
+        }
+      }
+    }
   }
 
   return allResults;
@@ -139,7 +243,11 @@ export function buildReport(
   return {
     skill: suite.skill ?? '',
     description: suite.description ?? '',
-    timestamp: new Date().toISOString(),
+    timestamp: (() => {
+      const d = new Date();
+      const pad = (n: number, len = 2) => String(n).padStart(len, '0');
+      return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}+08:00`;
+    })(),
     modelIds: models.map((m) => m.id),
     cases: suite.cases.map((c, i) => ({
       id: c.id ?? String(i + 1),

@@ -91,52 +91,85 @@
   </el-dialog>
 
   <!-- 模型列表编辑对话框 -->
-  <el-dialog v-model="modelDialogVisible" title="编辑模型列表" width="500px" align-center>
+  <el-dialog v-model="modelDialogVisible" title="编辑模型列表" width="520px" align-center>
     <div class="dialog-inner">
-      <div style="margin-bottom:14px">
-        <div class="dialog-hint">
-          Cloud 模式切换指令前缀（实际发送：前缀 + 空格 + 模型名）
+
+      <!-- Cloud 模式 -->
+      <template v-if="agentMode === 'cloud'">
+        <div style="margin-bottom:14px">
+          <div class="dialog-hint">切换指令前缀（实际发送：前缀 + 空格 + 模型名）</div>
+          <el-input v-model="editingPrefix" size="small" placeholder="/model" />
         </div>
-        <el-input v-model="editingPrefix" size="small" placeholder="/model" />
-      </div>
-      <div class="dialog-hint" style="margin-bottom:6px">模型列表</div>
-      <!-- 列 header -->
-      <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;padding:0 2px">
-        <span style="width:20px;flex-shrink:0" />
-        <span class="col-label" style="flex:1">模型名</span>
-        <span class="col-label" style="flex:1.2">Local ID（providerId/modelId）</span>
-        <span style="width:28px;flex-shrink:0" />
-      </div>
-      <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:10px">
-        <div
-          v-for="(_, idx) in editingIds"
-          :key="idx"
-          style="display:flex;align-items:center;gap:6px"
-        >
-          <span class="dialog-index">{{ idx + 1 }}</span>
-          <el-input
-            v-model="editingIds[idx]"
-            size="small"
-            placeholder="如 gpt-4o"
-            style="flex:1"
-          />
-          <el-input
-            v-model="editingLocalModels[editingIds[idx] ?? '']"
-            size="small"
-            placeholder="如 custom-dashscope/qwen3"
-            style="flex:1.2"
-            class="input-mono"
-          />
-          <el-button size="small" text type="danger" @click="removeModel(idx)">×</el-button>
+        <div class="dialog-hint" style="margin-bottom:6px">模型列表</div>
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;padding:0 2px">
+          <span style="width:20px;flex-shrink:0" />
+          <span class="col-label" style="flex:1">模型名</span>
+          <span style="width:28px;flex-shrink:0" />
         </div>
-      </div>
-      <div class="dialog-hint" style="margin-bottom:10px">
-        Local 模式填写 OpenClaw 的 provider/modelId，如
-        <code>custom-dashscope/qwen3.5-plus</code>，留空则不参与 local 测试。
-      </div>
-      <el-button size="small" plain style="width:100%;margin-bottom:4px" @click="addModel">
-        + 添加模型
-      </el-button>
+        <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:10px">
+          <div
+            v-for="(_, idx) in editingCloudIds"
+            :key="idx"
+            style="display:flex;align-items:center;gap:6px"
+          >
+            <span class="dialog-index">{{ idx + 1 }}</span>
+            <el-input
+              v-model="editingCloudIds[idx]"
+              size="small"
+              placeholder="如 gpt-4o"
+              style="flex:1"
+            />
+            <el-button size="small" text type="danger" @click="removeCloudModel(idx)">×</el-button>
+          </div>
+        </div>
+        <el-button size="small" plain style="width:100%;margin-bottom:4px" @click="addCloudModel">
+          + 添加模型
+        </el-button>
+      </template>
+
+      <!-- Local 模式 -->
+      <template v-else>
+        <div class="dialog-hint" style="margin-bottom:6px">模型列表</div>
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;padding:0 2px">
+          <span style="width:20px;flex-shrink:0" />
+          <span class="col-label" style="flex:1">供应商</span>
+          <span class="col-label" style="flex:1">模型 ID</span>
+          <span style="width:28px;flex-shrink:0" />
+        </div>
+        <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:10px">
+          <div
+            v-for="(_, idx) in editingProviders"
+            :key="idx"
+            style="display:flex;align-items:center;gap:6px"
+          >
+            <span class="dialog-index">{{ idx + 1 }}</span>
+            <el-select
+              v-model="editingProviders[idx]"
+              size="small"
+              placeholder="供应商"
+              style="flex:1"
+              clearable
+            >
+              <el-option v-for="p in availableProviders" :key="p" :label="p" :value="p" />
+            </el-select>
+            <el-input
+              v-model="editingModelNames[idx]"
+              size="small"
+              placeholder="如 qwen3.5"
+              style="flex:1"
+              class="input-mono"
+            />
+            <el-button size="small" text type="danger" @click="removeLocalModel(idx)">×</el-button>
+          </div>
+        </div>
+        <div class="dialog-hint" style="margin-bottom:8px">
+          选择供应商后填入模型名，系统自动组合为 provider/modelId。
+        </div>
+        <el-button size="small" plain style="width:100%;margin-bottom:4px" @click="addLocalModel">
+          + 添加模型
+        </el-button>
+      </template>
+
     </div>
     <template #footer>
       <el-button size="small" @click="modelDialogVisible = false">取消</el-button>
@@ -148,9 +181,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, reactive, watch } from 'vue'
+import { ref, computed, onMounted, reactive, watch } from 'vue'
 import { ElMessage } from 'element-plus'
-import { getModels, saveModels, getSuites, getSuite, saveSuite } from '../api'
+import { getModels, saveModels, getSuites, getSuite, saveSuite, getLocalModels } from '../api'
 import type { ModelConfig, TestSuite } from '../types'
 
 const emit = defineEmits<{ run: [{ modelIds: string[]; suite: TestSuite }] }>()
@@ -162,6 +195,24 @@ defineExpose({ suite })
 // 模型
 const models = ref<ModelConfig[]>([])
 const selectedModelIds = ref<string[]>([])
+
+const STORAGE_KEY = 'selectedModelIds'
+
+function loadSelectedFromStorage(availableIds: string[]): string[] {
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY)
+    if (!saved) return []
+    const parsed = JSON.parse(saved) as string[]
+    // 只保留当前模型列表中仍存在的 id
+    return parsed.filter((id) => availableIds.includes(id))
+  } catch {
+    return []
+  }
+}
+
+watch(selectedModelIds, (ids) => {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(ids))
+}, { deep: true })
 
 // 套件
 const suiteFiles = ref<string[]>([])
@@ -212,7 +263,9 @@ async function autoSave() {
 onMounted(async () => {
   const resp = await getModels()
   models.value = resp.models
-  selectedModelIds.value = models.value.slice(0, 2).map((m) => m.id)
+  const allIds = resp.models.map((m) => m.id)
+  const restored = loadSelectedFromStorage(allIds)
+  selectedModelIds.value = restored.length > 0 ? restored : allIds.slice(0, 2)
   suiteFiles.value = await getSuites()
   if (suiteFiles.value.length > 0) {
     selectedFile.value = suiteFiles.value[0] ?? ''
@@ -280,46 +333,82 @@ async function confirmFileDialog() {
   fileDialogVisible.value = false
 }
 
+// 当前 agent 模式（从 /api/config 读取）
+const agentMode = ref<'cloud' | 'local'>('cloud')
+
 // 模型列表编辑
 const modelDialogVisible = ref(false)
 const editingPrefix = ref('/model')
-const editingIds = ref<string[]>([])
-const editingLocalModels = ref<Record<string, string>>({})
 const savingModels = ref(false)
 
+// Cloud 模式：纯模型名列表
+const editingCloudIds = ref<string[]>([])
+function addCloudModel() { editingCloudIds.value.push('') }
+function removeCloudModel(idx: number) { editingCloudIds.value.splice(idx, 1) }
+
+// Local 模式：供应商 + 模型名，拼成 provider/modelId
+const editingProviders = ref<string[]>([])
+const editingModelNames = ref<string[]>([])
+const availableLocalModels = ref<{ id: string; name: string; provider: string }[]>([])
+const availableProviders = computed(() =>
+  [...new Set(availableLocalModels.value.map((m) => m.provider))].sort()
+)
+function addLocalModel() {
+  editingProviders.value.push('')
+  editingModelNames.value.push('')
+}
+function removeLocalModel(idx: number) {
+  editingProviders.value.splice(idx, 1)
+  editingModelNames.value.splice(idx, 1)
+}
+
 async function openModelEditor() {
-  const resp = await getModels()
+  const [resp, configResp] = await Promise.all([
+    getModels(),
+    fetch('/api/config').then((r) => r.json()),
+  ])
+  agentMode.value = configResp.agentMode ?? 'cloud'
   editingPrefix.value = resp.prefix
-  editingIds.value = [...resp.ids]
-  editingLocalModels.value = { ...resp.localModels }
+
+  if (agentMode.value === 'cloud') {
+    editingCloudIds.value = [...resp.ids]
+  } else {
+    try { availableLocalModels.value = await getLocalModels() } catch { availableLocalModels.value = [] }
+    // 反解 provider/modelId → 两列
+    editingProviders.value = resp.ids.map((id) => { const s = id.lastIndexOf('/'); return s > 0 ? id.slice(0, s) : '' })
+    editingModelNames.value = resp.ids.map((id) => { const s = id.lastIndexOf('/'); return s > 0 ? id.slice(s + 1) : id })
+  }
+
   modelDialogVisible.value = true
 }
 
-function addModel() {
-  editingIds.value.push('')
-}
-
-function removeModel(idx: number) {
-  editingIds.value.splice(idx, 1)
-}
-
 async function confirmModelEdit() {
-  const validIds = editingIds.value.map((id) => id.trim()).filter(Boolean)
-  if (validIds.length === 0) {
-    ElMessage.warning('至少保留一个模型')
-    return
+  let validIds: string[]
+  if (agentMode.value === 'cloud') {
+    validIds = editingCloudIds.value.map((id) => id.trim()).filter(Boolean)
+  } else {
+    validIds = editingProviders.value
+      .map((p, i) => {
+        const m = editingModelNames.value[i]?.trim() ?? ''
+        return p && m ? `${p}/${m}` : ''
+      })
+      .filter(Boolean)
   }
-  if (!editingPrefix.value.trim()) {
-    ElMessage.warning('切换指令前缀不能为空')
+
+  if (validIds.length === 0) {
+    ElMessage.warning('至少保留一个有效模型')
     return
   }
   savingModels.value = true
   try {
-    await saveModels(editingPrefix.value.trim(), validIds, editingLocalModels.value)
+    await saveModels(editingPrefix.value.trim(), validIds, {})
     const resp = await getModels()
     models.value = resp.models
+    // 保存后重置勾选：保留仍存在的，新增的全部勾选
     const idSet = new Set(validIds)
-    selectedModelIds.value = selectedModelIds.value.filter((id) => idSet.has(id))
+    const kept = selectedModelIds.value.filter((id) => idSet.has(id))
+    const added = validIds.filter((id) => !selectedModelIds.value.includes(id))
+    selectedModelIds.value = [...kept, ...added]
     modelDialogVisible.value = false
     ElMessage.success('模型列表已保存')
   } catch (e) {

@@ -103,7 +103,9 @@ const router = useRouter()
 
 // ── Clock ──────────────────────────────────────────────────────
 function fmtClock() {
-  return new Date().toISOString().replace('T', ' ').slice(0, 19)
+  const d = new Date()
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
 }
 const clock = ref(fmtClock())
 let clockTimer: ReturnType<typeof setInterval>

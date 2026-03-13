@@ -170,7 +170,9 @@ async function main(): Promise<void> {
   });
 
   // 构建报告
-  const timestamp = new Date().toISOString();
+  const _d = new Date();
+  const _p = (n: number, l = 2) => String(n).padStart(l, '0');
+  const timestamp = `${_d.getFullYear()}-${_p(_d.getMonth()+1)}-${_p(_d.getDate())}T${_p(_d.getHours())}:${_p(_d.getMinutes())}:${_p(_d.getSeconds())}+08:00`;
   const report: EvalReport = {
     skill: suite.skill ?? args.suite ?? 'unknown',
     description: suite.description ?? '',

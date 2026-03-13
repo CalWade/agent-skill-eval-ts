@@ -9,6 +9,19 @@
 
 import type { AgentMode, CallResult } from './types.js';
 
+function localTimeStr() {
+  const d = new Date();
+  const pad = (n: number, len = 2) => String(n).padStart(len, '0');
+  return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}.${pad(d.getMilliseconds(), 3)}`;
+}
+
+function log(tag: string, msg: string, extra?: unknown) {
+  const ts = localTimeStr();
+  const line = `[agent][${ts}] ${tag} ${msg}`;
+  if (extra !== undefined) console.log(line, extra);
+  else console.log(line);
+}
+
 export interface AgentConfig {
   mode?: AgentMode;
   // cloud 模式
@@ -51,6 +64,9 @@ async function callAgentCloud(message: string, config: AgentConfig): Promise<Cal
     ...config.extraBody,
   };
 
+  log('→', `POST ${config.apiUrl}  timeout=${timeoutMs}ms`);
+  log('→', `instruction: ${message.slice(0, 100)}${message.length > 100 ? '...' : ''}`);
+
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   const startMs = Date.now();
@@ -67,10 +83,17 @@ async function callAgentCloud(message: string, config: AgentConfig): Promise<Cal
     });
 
     clearTimeout(timer);
-    return parseOpenAIResponse(response, Date.now() - startMs, timeoutMs);
+    const durationMs = Date.now() - startMs;
+    log(response.ok ? '←' : '✗', `HTTP ${response.status}  ${durationMs}ms`);
+    const result = await parseOpenAIResponse(response, durationMs, timeoutMs);
+    if (!result.success) log('✗', `parse failed: ${result.error}`);
+    return result;
   } catch (err) {
     clearTimeout(timer);
-    return catchError(err as Error, Date.now() - startMs, timeoutMs);
+    const durationMs = Date.now() - startMs;
+    const e = err as Error;
+    log('✗', `${e.name}: ${e.message}  (${durationMs}ms)`);
+    return catchError(e, durationMs, timeoutMs);
   }
 }
 
@@ -80,9 +103,10 @@ async function callAgentLocal(message: string, config: AgentConfig): Promise<Cal
   const timeoutMs = config.timeoutMs ?? 60_000;
   const baseUrl = config.localBaseUrl ?? 'http://127.0.0.1:18789';
   const url = `${baseUrl}/v1/chat/completions`;
+  const sessionKey = config.sessionKey ?? '(none)';
 
   const body: Record<string, unknown> = {
-    model: config.localModelId ?? 'openclaw',
+    model: 'openclaw',
     messages: [{ role: 'user', content: message }],
     stream: false,
   };
@@ -90,11 +114,13 @@ async function callAgentLocal(message: string, config: AgentConfig): Promise<Cal
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     Authorization: `Bearer ${config.localToken ?? ''}`,
-    'x-openclaw-agent-id': 'main',
   };
   if (config.sessionKey) {
     headers['x-openclaw-session-key'] = config.sessionKey;
   }
+
+  log('→', `POST ${url}  session=${sessionKey}  timeout=${timeoutMs}ms`);
+  log('→', `instruction: ${message.slice(0, 100)}${message.length > 100 ? '...' : ''}`);
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -109,10 +135,26 @@ async function callAgentLocal(message: string, config: AgentConfig): Promise<Cal
     });
 
     clearTimeout(timer);
-    return parseOpenAIResponse(response, Date.now() - startMs, timeoutMs);
+    const durationMs = Date.now() - startMs;
+    log(response.ok ? '←' : '✗', `HTTP ${response.status}  ${durationMs}ms`);
+    if (!response.ok) {
+      const text = await response.text().catch(() => '');
+      log('✗', `body: ${text.slice(0, 300)}`);
+      return failure(`HTTP ${response.status}: ${text.slice(0, 200)}`, durationMs);
+    }
+    const result = await parseOpenAIResponse(response, durationMs, timeoutMs);
+    if (result.success) {
+      log('←', `output: ${result.output.slice(0, 120)}${result.output.length > 120 ? '...' : ''}`);
+    } else {
+      log('✗', `parse failed: ${result.error}`);
+    }
+    return result;
   } catch (err) {
     clearTimeout(timer);
-    return catchError(err as Error, Date.now() - startMs, timeoutMs);
+    const durationMs = Date.now() - startMs;
+    const e = err as Error;
+    log('✗', `${e.name}: ${e.message}  (${durationMs}ms)`);
+    return catchError(e, durationMs, timeoutMs);
   }
 }
 

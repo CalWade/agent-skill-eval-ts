@@ -20,7 +20,7 @@
 import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
-import { readFileSync, writeFileSync, readdirSync, existsSync, mkdirSync } from 'fs';
+import { readFileSync, writeFileSync, readdirSync, existsSync, mkdirSync, appendFileSync } from 'fs';
 import { join, resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import yaml from 'js-yaml';
@@ -33,10 +33,92 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(__dirname, '..');
 const SUITES_DIR = join(ROOT, 'suites');
 const RESULTS_DIR = join(ROOT, 'results');
+const LOGS_DIR = join(ROOT, 'logs');
+const LOG_FILE = join(LOGS_DIR, 'server.log');
+
+// ── 日志持久化 ────────────────────────────────────────────────
+mkdirSync(LOGS_DIR, { recursive: true });
+{
+  const d = new Date();
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const ts = `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+  appendFileSync(LOG_FILE, `\n${'='.repeat(60)}\n[server] 启动 ${ts}\n${'='.repeat(60)}\n`);
+}
+const _origLog = console.log.bind(console);
+const _origErr = console.error.bind(console);
+console.log = (...args: unknown[]) => {
+  const line = args.map(String).join(' ');
+  _origLog(line);
+  appendFileSync(LOG_FILE, line + '\n');
+};
+console.error = (...args: unknown[]) => {
+  const line = args.map(String).join(' ');
+  _origErr(line);
+  appendFileSync(LOG_FILE, '[ERROR] ' + line + '\n');
+};
 
 const app = express();
 app.use(cors());
 app.use(express.json());
+
+// ── GET /api/localModels ──────────────────────────────────────
+// 从 ~/.openclaw/openclaw.json 读取 provider 配置，
+// 并调用每个 provider 的 /v1/models 获取完整模型列表。
+
+app.get('/api/localModels', async (_req, res) => {
+  try {
+    const ocPath = join(process.env['HOME'] ?? '', '.openclaw', 'openclaw.json');
+    if (!existsSync(ocPath)) { res.json([]); return; }
+    const config = JSON.parse(readFileSync(ocPath, 'utf-8'));
+    const providers = config?.models?.providers ?? {};
+
+    const result: { id: string; name: string; provider: string }[] = [];
+
+    await Promise.all(
+      Object.entries(providers).map(async ([providerId, provider]) => {
+        const p = provider as Record<string, unknown>;
+        const baseUrl = (p['baseUrl'] as string ?? '').replace(/\/$/, '');
+        const apiKey = p['apiKey'] as string ?? '';
+
+        try {
+          const resp = await fetch(`${baseUrl}/v1/models`, {
+            headers: { Authorization: `Bearer ${apiKey}` },
+            signal: AbortSignal.timeout(8000),
+          });
+          if (resp.ok) {
+            const data = await resp.json() as { data?: Array<{ id: string }> };
+            const models = data.data ?? [];
+            for (const m of models) {
+              result.push({
+                id: `${providerId}/${m.id}`,
+                name: `${m.id}  (${providerId})`,
+                provider: providerId,
+              });
+            }
+            return;
+          }
+        } catch { /* provider 不支持 /v1/models，回退到 openclaw.json 里的静态列表 */ }
+
+        // 回退：用 openclaw.json 里已配置的模型
+        const staticModels = p['models'] as Array<Record<string, unknown>> ?? [];
+        for (const m of staticModels) {
+          const modelId = m['id'] as string;
+          result.push({
+            id: `${providerId}/${modelId}`,
+            name: `${modelId}  (${providerId})`,
+            provider: providerId,
+          });
+        }
+      })
+    );
+
+    // 按 provider 排序，provider 内按 id 排序
+    result.sort((a, b) => a.provider.localeCompare(b.provider) || a.id.localeCompare(b.id));
+    res.json(result);
+  } catch (e) {
+    res.status(500).json({ error: (e as Error).message });
+  }
+});
 
 // ── GET /api/config ───────────────────────────────────────────
 
@@ -260,11 +342,12 @@ app.post('/api/run', async (req, res) => {
   const report = buildReport(suite, selectedModels, results);
 
   // 保存报告文件
-  mkdirSync(RESULTS_DIR, { recursive: true });
   const ts = report.timestamp.replace(/[:.]/g, '-').replace('T', '_').slice(0, 16);
-  const skillName = suite.skill ?? 'suite';
+  const skillName = (suite.skill ?? 'suite').replace(/\//g, '_');
   const reportFile = `${skillName}-${ts}.json`;
-  writeFileSync(join(RESULTS_DIR, reportFile), JSON.stringify(report, null, 2), 'utf-8');
+  const reportPath = join(RESULTS_DIR, reportFile);
+  mkdirSync(RESULTS_DIR, { recursive: true });
+  writeFileSync(reportPath, JSON.stringify(report, null, 2), 'utf-8');
 
   send('done', { report, reportFile });
   res.end();

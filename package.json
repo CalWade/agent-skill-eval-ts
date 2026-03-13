@@ -4,8 +4,8 @@
   "description": "AI Agent Skill 多模型评测工具（TypeScript）",
   "type": "module",
   "scripts": {
-    "dev": "concurrently \"tsx server/api.ts\" \"pnpm --filter web dev\"",
-    "server": "tsx server/api.ts",
+    "dev": "concurrently \"tsx server/api.ts >> logs/server.log 2>&1\" \"pnpm --filter web dev\"",
+    "server": "tsx server/api.ts >> logs/server.log 2>&1",
     "eval": "tsx server/cli.ts",
     "smoke": "tsx server/cli.ts --suite examples/feishu/smoke.yaml",
     "smoke:dry": "tsx server/cli.ts --suite examples/feishu/smoke.yaml --dry-run",

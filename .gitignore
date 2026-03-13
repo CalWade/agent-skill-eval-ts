@@ -32,3 +32,4 @@ results/*.md
 
 # pnpm
 .pnpm-debug.log
+logs/
