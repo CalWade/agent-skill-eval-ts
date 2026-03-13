@@ -36,7 +36,13 @@
       >
         <el-option v-for="f in suiteFiles" :key="f" :label="f" :value="f" />
       </el-select>
-      <el-button size="small" @click="newSuite">新建</el-button>
+      <el-button size="small" @click="openFileDialog(false)">新建</el-button>
+    </div>
+
+    <!-- 当前文件名 + 重命名入口 -->
+    <div v-if="selectedFile" style="display:flex;align-items:center;gap:6px;margin-bottom:8px">
+      <span class="file-path">{{ selectedFile }}</span>
+      <el-button size="small" text style="padding:0 4px;flex-shrink:0" @click="openFileDialog(true)">重命名</el-button>
     </div>
 
     <!-- 套件信息 -->
@@ -54,6 +60,31 @@
       :disabled="!selectedFile || suite.cases.length === 0"
     >保存套件</el-button>
   </el-card>
+
+  <!-- 新建 / 重命名文件对话框 -->
+  <el-dialog v-model="fileDialogVisible" :title="fileDialogRename ? '重命名套件' : '新建套件'" width="400px" align-center>
+    <div class="dialog-inner">
+      <div class="dialog-hint" style="margin-bottom:6px">
+        文件路径（相对 suites/ 目录，不含扩展名）
+      </div>
+      <el-input
+        v-model="fileDialogPath"
+        size="small"
+        placeholder="如 feishu/smoke 或 wework/regression"
+        class="input-mono"
+        @keyup.enter="confirmFileDialog"
+      />
+      <div class="dialog-hint" style="margin-top:6px">
+        保存为 <code>suites/{{ fileDialogPath || '...' }}.yaml</code>
+      </div>
+    </div>
+    <template #footer>
+      <el-button size="small" @click="fileDialogVisible = false">取消</el-button>
+      <el-button size="small" type="primary" :disabled="!fileDialogPath.trim()" @click="confirmFileDialog">
+        {{ fileDialogRename ? '重命名并保存' : '创建' }}
+      </el-button>
+    </template>
+  </el-dialog>
 
   <!-- 模型列表编辑对话框 -->
   <el-dialog v-model="modelDialogVisible" title="编辑模型列表" width="500px" align-center>
@@ -155,19 +186,12 @@ async function loadSuite() {
   if (!selectedFile.value) return
   try {
     const { suite: s } = await getSuite(selectedFile.value)
-    suite.skill = s.skill  // 服务端已做 fallback，可能是从路径推断的值
+    suite.skill = s.skill
     suite.description = s.description ?? ''
     suite.cases = s.cases
   } catch (e) {
     ElMessage.error(String(e))
   }
-}
-
-function newSuite() {
-  selectedFile.value = ''
-  suite.skill = undefined
-  suite.description = ''
-  suite.cases = []
 }
 
 async function saveSuiteToServer() {
@@ -182,6 +206,52 @@ async function saveSuiteToServer() {
   } finally {
     saving.value = false
   }
+}
+
+// ── 新建 / 重命名 文件对话框 ───────────────────────────────────
+const fileDialogVisible = ref(false)
+const fileDialogRename = ref(false)   // true = 重命名模式，false = 新建模式
+const fileDialogPath = ref('')
+
+function openFileDialog(rename: boolean) {
+  fileDialogRename.value = rename
+  // 重命名时预填当前路径（去掉 .yaml）
+  fileDialogPath.value = rename ? selectedFile.value.replace(/\.ya?ml$/, '') : ''
+  fileDialogVisible.value = true
+}
+
+async function confirmFileDialog() {
+  const raw = fileDialogPath.value.trim()
+  if (!raw) return
+  // 规范化：去掉用户可能手打的 .yaml 后缀，再加回来
+  const normalized = raw.replace(/\.ya?ml$/, '')
+  const newFile = normalized + '.yaml'
+
+  if (fileDialogRename.value) {
+    // 重命名：把当前内容保存到新路径
+    saving.value = true
+    try {
+      await saveSuite(newFile, { ...suite })
+      suiteFiles.value = await getSuites()
+      selectedFile.value = newFile
+      ElMessage.success(`已保存为 ${newFile}`)
+    } catch (e) {
+      ElMessage.error(String(e))
+    } finally {
+      saving.value = false
+    }
+  } else {
+    // 新建：清空内容，切换到新路径（不立即写文件，等用户添加用例后手动保存）
+    selectedFile.value = newFile
+    suite.skill = undefined
+    suite.description = ''
+    suite.cases = []
+    // 如果文件已存在则加载
+    if (suiteFiles.value.includes(newFile)) {
+      await loadSuite()
+    }
+  }
+  fileDialogVisible.value = false
 }
 
 // 模型列表编辑
@@ -310,6 +380,16 @@ async function confirmModelEdit() {
 .input-mono :deep(.el-input__inner) {
   font-family: var(--font-mono, monospace);
   font-size: 11px;
+}
+.file-path {
+  font-family: var(--font-mono, monospace);
+  font-size: 11px;
+  color: var(--text-muted, #666);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+  min-width: 0;
 }
 code {
   font-family: var(--font-mono, monospace);
