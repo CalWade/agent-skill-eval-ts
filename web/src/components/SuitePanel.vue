@@ -52,13 +52,18 @@
       </el-form-item>
     </el-form>
 
-    <!-- 自动保存状态 -->
-    <div v-if="selectedFile" class="save-status">
-      <span v-if="saving" class="save-state saving">保存中…</span>
-      <span v-else-if="saveError" class="save-state error">保存失败</span>
-      <span v-else class="save-state saved">已自动保存</span>
-    </div>
+    <!-- 保存失败时的内联提示（成功用 toast） -->
+    <div v-if="saveError" class="save-error-inline">保存失败，请检查文件权限</div>
   </el-card>
+
+  <!-- 自动保存 toast -->
+  <Teleport to="body">
+    <Transition name="save-toast">
+      <div v-if="toastVisible" class="save-toast">
+        <span class="save-toast-icon">✓</span> 已保存
+      </div>
+    </Transition>
+  </Teleport>
 
   <!-- 新建 / 重命名文件对话框 -->
   <el-dialog v-model="fileDialogVisible" :title="fileDialogRename ? '重命名套件' : '新建套件'" width="400px" align-center>
@@ -163,6 +168,14 @@ const suiteFiles = ref<string[]>([])
 const selectedFile = ref('')
 const saving = ref(false)
 const saveError = ref(false)
+const toastVisible = ref(false)
+let toastTimer: ReturnType<typeof setTimeout> | null = null
+
+function showSaveToast() {
+  if (toastTimer) clearTimeout(toastTimer)
+  toastVisible.value = true
+  toastTimer = setTimeout(() => { toastVisible.value = false }, 2000)
+}
 
 function emitPayload() {
   emit('run', { modelIds: selectedModelIds.value, suite: { ...suite } })
@@ -188,6 +201,7 @@ async function autoSave() {
   saveError.value = false
   try {
     await saveSuite(selectedFile.value, { ...suite })
+    showSaveToast()
   } catch {
     saveError.value = true
   } finally {
@@ -393,18 +407,12 @@ async function confirmModelEdit() {
   font-family: var(--font-mono, monospace);
   font-size: 11px;
 }
-.save-status {
-  display: flex;
-  justify-content: flex-end;
+.save-error-inline {
+  font-size: 11px;
+  color: var(--status-fail, #f56c6c);
+  text-align: right;
   padding: 2px 0 4px;
 }
-.save-state {
-  font-size: 11px;
-  letter-spacing: 0.03em;
-}
-.save-state.saving { color: var(--text-muted, #666); }
-.save-state.saved   { color: var(--text-muted, #555); }
-.save-state.error   { color: var(--status-fail, #f56c6c); }
 
 .file-path {
   font-family: var(--font-mono, monospace);
@@ -423,6 +431,46 @@ code {
   padding: 1px 4px;
   border-radius: 3px;
 }
+</style>
+
+<!-- toast 必须全局样式，Teleport 脱离 scoped 上下文后 scoped hash 不匹配 -->
+<style>
+.save-toast {
+  position: fixed;
+  bottom: 28px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #1a1d2e;
+  border: 1px solid rgba(0, 200, 212, 0.35);
+  border-radius: 20px;
+  padding: 6px 16px 6px 12px;
+  font-size: 12px;
+  color: #00c8d4;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  box-shadow: 0 6px 20px rgba(0,0,0,0.5), 0 0 0 1px rgba(0,200,212,0.06);
+  pointer-events: none;
+  z-index: 9999;
+  white-space: nowrap;
+  letter-spacing: 0.02em;
+}
+.save-toast-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  background: rgba(0, 200, 212, 0.15);
+  border-radius: 50%;
+  font-size: 10px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+.save-toast-enter-active { transition: opacity 0.18s ease, transform 0.18s ease; }
+.save-toast-leave-active { transition: opacity 0.22s ease, transform 0.22s ease; }
+.save-toast-enter-from   { opacity: 0; transform: translateX(-50%) translateY(10px); }
+.save-toast-leave-to     { opacity: 0; transform: translateX(-50%) translateY(5px); }
 </style>
 
 
