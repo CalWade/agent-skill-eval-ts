@@ -45,12 +45,24 @@ function sleep(ms: number): Promise<void> {
  * cloud 模式：发 switchCmd 消息切换模型，等待 switchWaitMs
  * local 模式：跳过切换步骤，每个用例携带独立 sessionKey 隔离上下文
  */
+/** 补全 TestCase 缺省字段，保证执行层 id/title 始终是字符串 */
+type NormalizedCase = Omit<TestCase, 'id' | 'title'> & { id: string; title: string };
+
+function normalizeCases(cases: TestCase[]): NormalizedCase[] {
+  return cases.map((c, i) => ({
+    ...c,
+    id: c.id ?? String(i + 1),
+    title: c.title ?? c.instruction.slice(0, 40),
+  }));
+}
+
 export async function executeRun(
   models: ModelConfig[],
-  cases: TestCase[],
+  rawCases: TestCase[],
   config: RunConfig,
   callbacks: RunCallbacks = {},
 ): Promise<CaseModelResult[]> {
+  const cases = normalizeCases(rawCases);
   const allResults: CaseModelResult[] = [];
   const isLocal = config.agent.mode === 'local';
   const runId = config.runId ?? Date.now().toString(36);
@@ -125,12 +137,13 @@ export function buildReport(
   results: CaseModelResult[],
 ): EvalReport {
   return {
-    skill: suite.skill,
+    skill: suite.skill ?? '',
     description: suite.description ?? '',
     timestamp: new Date().toISOString(),
     modelIds: models.map((m) => m.id),
-    cases: suite.cases.map((c) => ({
-      id: c.id, title: c.title,
+    cases: suite.cases.map((c, i) => ({
+      id: c.id ?? String(i + 1),
+      title: c.title ?? c.instruction.slice(0, 40),
       instruction: c.instruction,
       sideEffect: c.side_effect ?? 'none',
     })),

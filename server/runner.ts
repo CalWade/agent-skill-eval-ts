@@ -18,7 +18,7 @@ export async function runAll(
   config: RunConfig,
 ): Promise<CaseModelResult[]> {
   // 预建 caseId → TestCase 映射，供 onCaseResult 回调查原始 instruction
-  const caseMap = new Map<string, TestCase>(cases.map((c) => [c.id, c]));
+  const caseMap = new Map<string, TestCase>(cases.map((c, i) => [c.id ?? String(i + 1), c]));
   // 每个模型的结果暂存，用于打印小结
   const modelResultsMap = new Map<string, CaseModelResult[]>();
   for (const m of models) modelResultsMap.set(m.id, []);

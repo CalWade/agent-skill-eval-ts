@@ -9,9 +9,9 @@
  *   POST /api/config          保存配置（写入 .env）
  *   GET  /api/models          返回模型列表
  *   POST /api/models          保存模型列表
- *   GET  /api/suites          列出 examples/ 下所有 YAML 文件
- *   GET  /api/suite?file=xxx  读取单个套件的用例
- *   POST /api/suite           保存套件（写回 YAML 文件）
+ *   GET  /api/suites          列出 suites/ 下所有 YAML 文件
+ *   GET  /api/suite?file=xxx  读取单个套件（自动补全 id/title/skill）
+ *   POST /api/suite           保存套件（只写用户填写的字段）
  *   POST /api/run             启动测试，SSE 推送进度
  *   GET  /api/reports         列出历史报告
  *   GET  /api/report?file=xxx 读取单个报告
@@ -27,11 +27,11 @@ import yaml from 'js-yaml';
 import { readEnvFile, writeEnvFile, loadConfig } from './services/configService.js';
 import { readModelsFile, getModels, saveModelsFile } from './services/modelService.js';
 import { executeRun, buildReport } from './services/runService.js';
-import type { TestSuite, CaseModelResult, EvalReport, ModelConfig } from './types.js';
+import type { TestSuite, TestCase, CaseModelResult, EvalReport, ModelConfig } from './types.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(__dirname, '..');
-const EXAMPLES_DIR = join(ROOT, 'examples');
+const SUITES_DIR = join(ROOT, 'suites');
 const RESULTS_DIR = join(ROOT, 'results');
 
 const app = express();
@@ -111,7 +111,7 @@ app.post('/api/models', (req, res) => {
 // ── GET /api/suites ───────────────────────────────────────────
 
 app.get('/api/suites', (_req, res) => {
-  if (!existsSync(EXAMPLES_DIR)) { res.json([]); return; }
+  if (!existsSync(SUITES_DIR)) { res.json([]); return; }
   const files: string[] = [];
   function walk(dir: string, base: string) {
     for (const entry of readdirSync(dir, { withFileTypes: true })) {
@@ -120,19 +120,42 @@ app.get('/api/suites', (_req, res) => {
         files.push(base + entry.name);
     }
   }
-  walk(EXAMPLES_DIR, '');
+  walk(SUITES_DIR, '');
   res.json(files);
 });
 
 // ── GET /api/suite ────────────────────────────────────────────
 
+/**
+ * 从文件路径推断 skill 名称：去掉扩展名，取最后一段目录+文件名。
+ * 例："feishu/smoke.yaml" → "feishu/smoke"
+ */
+function skillFromPath(file: string): string {
+  return file.replace(/\.ya?ml$/, '');
+}
+
+/** 补全 TestCase 缺省字段，不修改原始 YAML 内容 */
+function normalizeCases(cases: TestCase[]): TestCase[] {
+  return cases.map((c, i) => ({
+    ...c,
+    id: c.id ?? String(i + 1),
+    title: c.title ?? c.instruction.slice(0, 40),
+  }));
+}
+
 app.get('/api/suite', (req, res) => {
   const file = req.query['file'] as string;
   if (!file) { res.status(400).json({ error: '缺少 file 参数' }); return; }
-  const fullPath = join(EXAMPLES_DIR, file);
+  const fullPath = join(SUITES_DIR, file);
   if (!existsSync(fullPath)) { res.status(404).json({ error: '文件不存在' }); return; }
   try {
-    const suite = yaml.load(readFileSync(fullPath, 'utf-8')) as TestSuite;
+    const raw = yaml.load(readFileSync(fullPath, 'utf-8')) as TestSuite;
+    const suite: TestSuite = {
+      ...raw,
+      // skill 从路径推断，YAML 里有则优先用
+      skill: raw.skill ?? skillFromPath(file),
+      cases: normalizeCases(raw.cases ?? []),
+    };
     res.json({ file, suite });
   } catch (e) {
     res.status(500).json({ error: (e as Error).message });
@@ -144,10 +167,27 @@ app.get('/api/suite', (req, res) => {
 app.post('/api/suite', (req, res) => {
   const { file, suite } = req.body as { file: string; suite: TestSuite };
   if (!file || !suite) { res.status(400).json({ error: '缺少 file 或 suite' }); return; }
-  const fullPath = join(EXAMPLES_DIR, file);
+  const fullPath = join(SUITES_DIR, file);
   mkdirSync(dirname(fullPath), { recursive: true });
   try {
-    writeFileSync(fullPath, yaml.dump(suite, { lineWidth: -1 }), 'utf-8');
+    // 写入时剥离自动生成的字段，保持 YAML 简洁
+    const skillFromFile = skillFromPath(file);
+    const toWrite: TestSuite = {
+      // skill 与路径一致则省略（避免冗余），不一致时保留
+      ...(suite.skill && suite.skill !== skillFromFile ? { skill: suite.skill } : {}),
+      ...(suite.description ? { description: suite.description } : {}),
+      cases: suite.cases.map((c) => {
+        const autoId = String((suite.cases.indexOf(c)) + 1);
+        const autoTitle = c.instruction.slice(0, 40);
+        const out: TestCase = { instruction: c.instruction };
+        if (c.id && c.id !== autoId) out.id = c.id;
+        if (c.title && c.title !== autoTitle) out.title = c.title;
+        if (c.side_effect && c.side_effect !== 'none') out.side_effect = c.side_effect;
+        if (c.pass_criteria?.length) out.pass_criteria = c.pass_criteria;
+        return out;
+      }),
+    };
+    writeFileSync(fullPath, yaml.dump(toWrite, { lineWidth: -1 }), 'utf-8');
     res.json({ ok: true });
   } catch (e) {
     res.status(500).json({ error: (e as Error).message });
@@ -222,7 +262,8 @@ app.post('/api/run', async (req, res) => {
   // 保存报告文件
   mkdirSync(RESULTS_DIR, { recursive: true });
   const ts = report.timestamp.replace(/[:.]/g, '-').replace('T', '_').slice(0, 16);
-  const reportFile = `${suite.skill}-${ts}.json`;
+  const skillName = suite.skill ?? 'suite';
+  const reportFile = `${skillName}-${ts}.json`;
   writeFileSync(join(RESULTS_DIR, reportFile), JSON.stringify(report, null, 2), 'utf-8');
 
   send('done', { report, reportFile });

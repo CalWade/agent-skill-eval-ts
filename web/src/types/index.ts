@@ -9,15 +9,15 @@ export type PassCriteria =
   | { type: 'output_contains_any'; texts: string[] }
 
 export interface TestCase {
-  id: string
-  title: string
+  id?: string
+  title?: string
   instruction: string
   side_effect?: SideEffect
   pass_criteria?: PassCriteria[]
 }
 
 export interface TestSuite {
-  skill: string
+  skill?: string
   description?: string
   cases: TestCase[]
 }

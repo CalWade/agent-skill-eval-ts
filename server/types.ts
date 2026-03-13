@@ -38,15 +38,18 @@ export type PassCriteria =
   | { type: 'output_contains_any'; texts: string[] };
 
 export interface TestCase {
-  id: string;
-  title: string;
+  /** 可选。省略时按数组下标自动生成（"1", "2", ...） */
+  id?: string;
+  /** 可选。省略时取 instruction 前 40 字作为显示名 */
+  title?: string;
   instruction: string;
   side_effect?: SideEffect;
   pass_criteria?: PassCriteria[];
 }
 
 export interface TestSuite {
-  skill: string;
+  /** 可选。省略时从文件路径推断（去掉目录和扩展名） */
+  skill?: string;
   description?: string;
   cases: TestCase[];
 }

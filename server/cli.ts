@@ -8,6 +8,9 @@
  *   pnpm eval --suite <path> --dry-run
  *   pnpm eval --suite <path> --interval 5
  *   pnpm eval --list-models
+ *
+ * 示例:
+ *   pnpm eval --suite suites/feishu/smoke.yaml
  */
 
 import { readFileSync } from 'fs';
@@ -93,7 +96,7 @@ async function main(): Promise<void> {
 
   if (!args.suite) {
     console.error('错误: 必须指定 --suite <path>');
-    console.error('用法: pnpm eval --suite examples/feishu/smoke.yaml');
+    console.error('用法: pnpm eval --suite suites/feishu/smoke.yaml');
     process.exit(1);
   }
 
@@ -132,20 +135,22 @@ async function main(): Promise<void> {
 
   // Dry-run：只打印用例列表
   if (args.dryRun) {
-    console.log(`\n[dry-run] ${suite.skill} — ${cases.length} 条用例`);
+    console.log(`\n[dry-run] ${suite.skill ?? args.suite} — ${cases.length} 条用例`);
     console.log(`模型: ${models.map((m) => m.id).join(', ')}\n`);
-    for (const c of cases) {
+    cases.forEach((c, i) => {
+      const id = c.id ?? String(i + 1);
+      const title = c.title ?? c.instruction.slice(0, 40);
       const hasCriteria = (c.pass_criteria?.length ?? 0) > 0;
       console.log(
-        `  ${c.id.padEnd(12)} ${c.title.padEnd(24)} ` +
+        `  ${id.padEnd(12)} ${title.padEnd(24)} ` +
         `副作用: ${(c.side_effect ?? 'none').padEnd(6)} ` +
         `判定: ${hasCriteria ? c.pass_criteria!.length + '条' : '无（展示用）'}`,
       );
-    }
+    });
     return;
   }
 
-  printSuiteHeader(suite.skill, cases.length, models.map((m) => m.id));
+  printSuiteHeader(suite.skill ?? args.suite ?? 'suite', cases.length, models.map((m) => m.id));
 
   // 执行测试
   const intervalMs = args.intervalMs ?? appConfig.intervalMs;
@@ -167,13 +172,13 @@ async function main(): Promise<void> {
   // 构建报告
   const timestamp = new Date().toISOString();
   const report: EvalReport = {
-    skill: suite.skill,
+    skill: suite.skill ?? args.suite ?? 'unknown',
     description: suite.description ?? '',
     timestamp,
     modelIds: models.map((m) => m.id),
-    cases: cases.map((c) => ({
-      id: c.id,
-      title: c.title,
+    cases: cases.map((c, i) => ({
+      id: c.id ?? String(i + 1),
+      title: c.title ?? c.instruction.slice(0, 40),
       instruction: c.instruction,
       sideEffect: c.side_effect ?? 'none',
     })),

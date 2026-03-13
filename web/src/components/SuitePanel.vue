@@ -39,11 +39,8 @@
       <el-button size="small" @click="newSuite">新建</el-button>
     </div>
 
-    <!-- Skill 名称 -->
+    <!-- 套件信息 -->
     <el-form size="small" label-position="top" style="margin-bottom:8px">
-      <el-form-item label="Skill 名称">
-        <el-input v-model="suite.skill" placeholder="feishu-send-message" />
-      </el-form-item>
       <el-form-item label="描述（可选）">
         <el-input v-model="suite.description" placeholder="..." />
       </el-form-item>
@@ -54,7 +51,7 @@
       style="width:100%;margin-top:2px"
       @click="saveSuiteToServer"
       :loading="saving"
-      :disabled="suite.cases.length === 0"
+      :disabled="!selectedFile || suite.cases.length === 0"
     >保存套件</el-button>
   </el-card>
 
@@ -68,6 +65,13 @@
         <el-input v-model="editingPrefix" size="small" placeholder="/model" />
       </div>
       <div class="dialog-hint" style="margin-bottom:6px">模型列表</div>
+      <!-- 列 header -->
+      <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;padding:0 2px">
+        <span style="width:20px;flex-shrink:0" />
+        <span class="col-label" style="flex:1">模型名</span>
+        <span class="col-label" style="flex:1.2">Local ID（providerId/modelId）</span>
+        <span style="width:28px;flex-shrink:0" />
+      </div>
       <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:10px">
         <div
           v-for="(_, idx) in editingIds"
@@ -78,13 +82,13 @@
           <el-input
             v-model="editingIds[idx]"
             size="small"
-            placeholder="模型名，如 gpt-4o"
+            placeholder="如 gpt-4o"
             style="flex:1"
           />
           <el-input
             v-model="editingLocalModels[editingIds[idx] ?? '']"
             size="small"
-            placeholder="Local: providerId/modelId"
+            placeholder="如 custom-dashscope/qwen3"
             style="flex:1.2"
             class="input-mono"
           />
@@ -133,7 +137,7 @@ function emitPayload() {
   emit('run', { modelIds: selectedModelIds.value, suite: { ...suite } })
 }
 
-watch([selectedModelIds, () => suite.skill, () => suite.cases.length], emitPayload, { deep: true })
+watch([selectedModelIds, () => suite.cases.length], emitPayload, { deep: true })
 
 onMounted(async () => {
   const resp = await getModels()
@@ -151,7 +155,7 @@ async function loadSuite() {
   if (!selectedFile.value) return
   try {
     const { suite: s } = await getSuite(selectedFile.value)
-    suite.skill = s.skill
+    suite.skill = s.skill  // 服务端已做 fallback，可能是从路径推断的值
     suite.description = s.description ?? ''
     suite.cases = s.cases
   } catch (e) {
@@ -161,16 +165,13 @@ async function loadSuite() {
 
 function newSuite() {
   selectedFile.value = ''
-  suite.skill = ''
+  suite.skill = undefined
   suite.description = ''
   suite.cases = []
 }
 
 async function saveSuiteToServer() {
-  if (!selectedFile.value) {
-    const name = suite.skill || 'new-suite'
-    selectedFile.value = `${name}/suite.yaml`
-  }
+  if (!selectedFile.value) return
   saving.value = true
   try {
     await saveSuite(selectedFile.value, { ...suite })
@@ -293,6 +294,12 @@ async function confirmModelEdit() {
   width: 20px;
   text-align: right;
   flex-shrink: 0;
+}
+.col-label {
+  font-size: 11px;
+  color: var(--text-muted, #666);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
 }
 .dialog-preview {
   font-size: 11px;

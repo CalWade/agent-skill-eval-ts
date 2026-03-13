@@ -51,15 +51,18 @@
         </el-col>
       </el-row>
 
-      <el-button size="small" type="primary" :loading="saving" @click="save" style="width:100%">
-        保存配置
-      </el-button>
+      <div style="display:flex;align-items:center;gap:6px">
+        <el-button size="small" type="primary" :loading="saving" @click="save" style="flex:1">
+          保存配置
+        </el-button>
+        <span v-if="dirty && !saving" class="unsaved-dot" title="有未保存的修改">●</span>
+      </div>
     </el-form>
   </el-card>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, watch, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { getConfig, saveConfig } from '../api'
 
@@ -78,13 +81,22 @@ const form = ref({
   requestTimeout: '60',
 })
 const saving = ref(false)
+const dirty = ref(false)
+let loaded = false
 
 onMounted(async () => {
   try {
     const config = await getConfig()
     Object.assign(form.value, config)
-  } catch { /* 首次启动 .env 不存在，忽略 */ }
+  } catch { /* 首次启动 .env 不存在，忽略 */ } finally {
+    loaded = true
+  }
 })
+
+watch(form, () => { if (loaded) dirty.value = true }, { deep: true })
+
+// 切换模式时自动保存，避免跑测试时模式不匹配
+watch(() => form.value.agentMode, () => { if (loaded) save() })
 
 async function save() {
   saving.value = true
@@ -101,6 +113,7 @@ async function save() {
       requestInterval: form.value.requestInterval,
       requestTimeout:  form.value.requestTimeout,
     })
+    dirty.value = false
     ElMessage.success('配置已保存')
   } catch (e) {
     ElMessage.error(String(e))
@@ -111,6 +124,18 @@ async function save() {
 </script>
 
 <style scoped>
+.unsaved-dot {
+  color: var(--warn-amber, #f5a623);
+  font-size: 10px;
+  line-height: 1;
+  flex-shrink: 0;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+
 :deep(.input-mono .el-input__inner) {
   font-family: var(--font-mono);
   font-size: var(--fs-sm);

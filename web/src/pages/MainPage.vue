@@ -149,8 +149,7 @@ const pendingPayload = ref<{ modelIds: string[]; suite: TestSuite } | null>(null
 const canRun = computed(() =>
   pendingPayload.value !== null &&
   pendingPayload.value.modelIds.length > 0 &&
-  pendingPayload.value.suite.cases.length > 0 &&
-  pendingPayload.value.suite.skill.length > 0
+  pendingPayload.value.suite.cases.length > 0
 )
 
 function handleRun(payload: { modelIds: string[]; suite: TestSuite }) {
@@ -171,7 +170,7 @@ function handleStart() {
   const total = payload.suite.cases.length * payload.modelIds.length
   let completed = 0
 
-  addLog(`开始测试：${payload.suite.skill}`, 'info')
+  addLog(`开始测试：${payload.suite.skill ?? '(未命名)'}`, 'info')
   addLog(`模型：${payload.modelIds.join(', ')}`, 'muted')
   addLog(`用例数：${payload.suite.cases.length}`, 'muted')
 

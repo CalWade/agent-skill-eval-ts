@@ -1,7 +1,0 @@
-skill: feishu-skill
-description: 飞书 Skill 冒烟测试 — 验证基本能力，无真实副作用
-cases:
-  - id: TC-01
-    title: 基础对话 - 自我介绍
-    instruction: 你好，我正在本地测试
-    side_effect: none

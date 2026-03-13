@@ -15,7 +15,7 @@
         :class="{ 'case-card-alt': idx % 2 === 1 }"
       >
         <div class="case-card-header">
-          <span class="case-id">{{ c.id }}</span>
+          <span class="case-id">{{ c.id ?? String(idx + 1) }}</span>
           <el-tag size="small" :type="sideEffectTagType(c.side_effect)" effect="plain">
             {{ c.side_effect || 'none' }}
           </el-tag>
@@ -24,7 +24,7 @@
           <button class="delete-btn" @click="removeCase(idx)">删除</button>
         </div>
 
-        <div class="case-title">{{ c.title }}</div>
+        <div class="case-title">{{ c.title ?? c.instruction.slice(0, 40) }}</div>
 
         <div class="case-instruction-box">
           <span class="case-instruction-label">指令</span>
@@ -54,8 +54,8 @@
       <el-form :model="editingCase" size="small" label-position="top">
         <el-row :gutter="8">
           <el-col :span="10">
-            <el-form-item label="ID">
-              <el-input v-model="editingCase.id" placeholder="TC-01" />
+            <el-form-item label="ID（可选）">
+              <el-input v-model="editingCase.id" :placeholder="`省略则自动编号`" />
             </el-form-item>
           </el-col>
           <el-col :span="14">
@@ -68,8 +68,8 @@
             </el-form-item>
           </el-col>
         </el-row>
-        <el-form-item label="标题">
-          <el-input v-model="editingCase.title" placeholder="测试用例名称" />
+        <el-form-item label="标题（可选）">
+          <el-input v-model="editingCase.title" placeholder="省略则自动取指令前 40 字" />
         </el-form-item>
         <el-form-item label="指令（发给 Agent 的内容）">
           <el-input v-model="editingCase.instruction" type="textarea" :rows="4" />
@@ -128,8 +128,7 @@ const editingCase = ref<TestCase & { pass_criteria: PassCriteria[] }>({
 function addCase() {
   editingIdx = -1
   editingCase.value = {
-    id: `TC-${String(props.suite.cases.length + 1).padStart(2, '0')}`,
-    title: '', instruction: '', side_effect: 'none', pass_criteria: [],
+    id: '', title: '', instruction: '', side_effect: 'none', pass_criteria: [],
   }
   dialogVisible.value = true
 }
@@ -139,10 +138,10 @@ function editCase(idx: number) {
   const c = props.suite.cases[idx]
   if (!c) return
   editingCase.value = {
-    ...c,
     id: c.id ?? '',
     title: c.title ?? '',
     instruction: c.instruction ?? '',
+    side_effect: c.side_effect ?? 'none',
     pass_criteria: JSON.parse(JSON.stringify(c.pass_criteria ?? [])),
   }
   dialogVisible.value = true
@@ -154,12 +153,11 @@ function removeCase(idx: number) {
 }
 
 function confirmEdit() {
-  const c: TestCase = {
-    id: editingCase.value.id,
-    title: editingCase.value.title,
-    instruction: editingCase.value.instruction,
-    side_effect: editingCase.value.side_effect,
-  }
+  const c: TestCase = { instruction: editingCase.value.instruction }
+  if (editingCase.value.id) c.id = editingCase.value.id
+  if (editingCase.value.title) c.title = editingCase.value.title
+  if (editingCase.value.side_effect && editingCase.value.side_effect !== 'none')
+    c.side_effect = editingCase.value.side_effect
   if (editingCase.value.pass_criteria.length > 0) {
     c.pass_criteria = editingCase.value.pass_criteria
   }
