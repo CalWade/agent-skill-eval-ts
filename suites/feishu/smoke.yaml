@@ -1,6 +1,3 @@
 description: 飞书冒烟测试 v
 cases:
-  - instruction: 我们这是一个全新的会话吗，你上一条回复是什么你记得吗？
-    id: '2'
-    title: |
-      你一定要记住你叫 cal
+  - instruction: 你去网上看一下这个网站是干嘛的https://easyclaw.link/zh/market/738
