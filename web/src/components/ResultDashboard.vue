@@ -109,9 +109,14 @@
       <el-table-column
         v-for="modelId in report.modelIds"
         :key="modelId"
-        :label="modelId"
-        min-width="140"
+        min-width="160"
       >
+        <!-- 自定义列头：截短显示，tooltip 显示完整 -->
+        <template #header>
+          <el-tooltip :content="modelId" placement="top" :show-after="300">
+            <span class="col-model-label">{{ shortModelName(modelId) }}</span>
+          </el-tooltip>
+        </template>
         <template #default="{ row }">
           <CellResult :result="row.cells[modelId]" />
         </template>
@@ -306,6 +311,13 @@ function verdictClass(v: string) {
 
 function formatTime(iso: string) {
   return iso.replace('T', ' ').slice(0, 16)
+}
+
+/** 截取模型名末段用于列头显示，避免长名换行撑宽列 */
+function shortModelName(modelId: string): string {
+  // 取最后一个 / 后面的部分；无 / 则原样返回
+  const last = modelId.lastIndexOf('/')
+  return last >= 0 ? modelId.slice(last + 1) : modelId
 }
 
 // ── ECharts ───────────────────────────────────────────────────
@@ -689,6 +701,23 @@ watch(() => props.report, async () => { await nextTick(); initCharts() }, { deep
 }
 
 /* ── 对比表 ──────────────────────────────────────────────────── */
+
+/* 列头：单行截断，不换行 */
+.col-model-label {
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  color: var(--text-secondary);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: block;
+  max-width: 140px;
+  cursor: default;
+}
+
 .tc-cell {
   display: flex;
   align-items: center;

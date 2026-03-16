@@ -102,9 +102,7 @@ defineProps<{ result?: CaseModelResult }>()
   color: var(--text-primary, #d4d4d4);
   line-height: 1.7;
   white-space: pre-wrap;
-  word-break: break-all;
-  max-height: 200px;
-  overflow-y: auto;
+  word-break: break-word;
 }
 .reply-error {
   font-size: 12px;

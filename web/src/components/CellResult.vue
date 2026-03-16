@@ -1,6 +1,8 @@
 <template>
   <div v-if="!result" class="cell-empty">-</div>
   <div v-else class="cell">
+
+    <!-- 主行：verdict + 耗时 -->
     <div class="cell-main">
       <span class="cell-verdict" :class="result.verdict.toLowerCase()">
         {{ verdictIcon }}
@@ -8,22 +10,25 @@
       <span class="cell-dur">{{ (result.call.durationMs / 1000).toFixed(1) }}s</span>
       <span v-if="result.call.totalTokens" class="cell-tok">{{ result.call.totalTokens }}t</span>
     </div>
-    <!-- Trace 摘要 -->
-    <div v-if="result.trace" class="cell-trace">
-      <span class="cell-trace-item" title="LLM 轮次">
-        <span class="cell-trace-icon">⟳</span>{{ result.trace.llmTurns }}
-      </span>
-      <span class="cell-trace-item" title="工具调用次数">
-        <span class="cell-trace-icon">⚙</span>{{ result.trace.toolCalls }}
-      </span>
-      <span
-        v-if="result.trace.toolErrors > 0"
-        class="cell-trace-item cell-trace-err"
-        title="工具报错次数"
-      >
-        <span class="cell-trace-icon">!</span>{{ result.trace.toolErrors }}
+
+    <!-- Trace 指标行 -->
+    <div v-if="result.trace" class="cell-trace-row">
+      <span class="cell-trace-pill">{{ result.trace.llmTurns }} 轮</span>
+      <span class="cell-trace-pill">{{ result.trace.toolCalls }} 工具</span>
+      <span v-if="result.trace.toolErrors > 0" class="cell-trace-pill cell-trace-err">
+        {{ result.trace.toolErrors }} 报错
       </span>
     </div>
+
+    <!-- 工具调用序列 -->
+    <div v-if="result.trace?.toolCallSequence?.length" class="cell-seq">
+      <span
+        v-for="(name, i) in result.trace.toolCallSequence"
+        :key="i"
+        class="cell-seq-chip"
+      >{{ name }}</span>
+    </div>
+
   </div>
 </template>
 
@@ -42,71 +47,90 @@ const verdictIcon = computed(() => {
 </script>
 
 <style scoped>
+.cell-empty {
+  color: var(--text-muted);
+  font-size: var(--fs-xs);
+}
+
 .cell {
   display: flex;
   flex-direction: column;
-  font-size: 12px;
-}
-.cell-empty {
-  color: var(--text-muted, #444);
-}
-.cell-verdict {
-  font-size: 12px;
-  font-family: var(--font-mono, monospace);
-  padding: 2px 4px;
-  border-radius: var(--radius-sm, 3px);
-}
-.cell-verdict.pass {
-  color: var(--status-pass, #3fc87a);
-  background: var(--status-pass-dim, rgba(63,200,122,0.12));
-}
-.cell-verdict.fail {
-  color: var(--status-fail, #e04a4a);
-  background: var(--status-fail-dim, rgba(224,74,74,0.12));
-}
-.cell-verdict.display {
-  color: var(--status-skip, #6b7280);
-  background: transparent;
-}
-.cell-dur {
-  font-family: var(--font-mono, monospace);
-  color: var(--text-secondary, #888);
-  font-size: var(--fs-xs, 11px);
-}
-.cell-tok {
-  font-family: var(--font-mono, monospace);
-  color: var(--text-muted, #555);
-  font-size: var(--fs-xs, 11px);
-  font-variant-numeric: tabular-nums;
+  gap: 4px;
+  padding: 2px 0;
 }
 
+/* ── 主行 ── */
 .cell-main {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 5px;
 }
 
-.cell-trace {
+.cell-verdict {
+  font-family: var(--font-mono);
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  padding: 1px 5px;
+  border-radius: var(--radius-sm);
+}
+.cell-verdict.pass    { color: var(--status-pass); background: rgba(63,200,122,0.12); }
+.cell-verdict.fail    { color: var(--status-fail); background: rgba(224,74,74,0.12); }
+.cell-verdict.display { color: var(--text-muted);  background: transparent; border: 1px dashed var(--text-muted); }
+
+.cell-dur {
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.cell-tok {
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Trace 指标行 ── */
+.cell-trace-row {
   display: flex;
-  gap: 6px;
-  margin-top: 3px;
+  flex-wrap: wrap;
+  gap: 3px;
 }
 
-.cell-trace-item {
-  font-family: var(--font-mono, monospace);
+.cell-trace-pill {
+  font-family: var(--font-mono);
   font-size: 10px;
-  color: var(--text-muted, #555);
-  display: flex;
-  align-items: center;
-  gap: 2px;
-}
-
-.cell-trace-icon {
-  font-size: 9px;
-  opacity: 0.7;
+  color: var(--text-secondary);
+  background: rgba(255,255,255,0.05);
+  border: 1px solid var(--border-base);
+  border-radius: var(--radius-sm);
+  padding: 0 5px;
+  line-height: 18px;
 }
 
 .cell-trace-err {
-  color: var(--status-fail, #e04a4a);
+  color: var(--status-fail);
+  background: rgba(224,74,74,0.08);
+  border-color: rgba(224,74,74,0.25);
+}
+
+/* ── 工具调用序列 ── */
+.cell-seq {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+}
+
+.cell-seq-chip {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--accent-cyan);
+  background: rgba(0,200,212,0.07);
+  border: 1px solid rgba(0,200,212,0.18);
+  border-radius: var(--radius-sm);
+  padding: 0 4px;
+  line-height: 16px;
+  white-space: nowrap;
 }
 </style>
