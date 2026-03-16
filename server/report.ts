@@ -26,47 +26,74 @@ export function printModelHeader(modelId: string, index: number, total: number):
 }
 
 export function printCaseResult(testCase: TestCase, result: CaseModelResult): void {
-  const { call, verdict, failReasons } = result;
+  const { verdict, failReasons } = result;
+  const isMultiStep = Array.isArray(result.steps) && result.steps.length > 0;
 
   // 标题行
-  console.log(`\n[${testCase.id}] ${testCase.title}`);
-  console.log(`  指令: ${testCase.instruction}`);
+  const stepLabel = isMultiStep ? `  [${result.steps!.length} 步]` : '';
+  console.log(`\n[${testCase.id ?? result.caseId}] ${testCase.title ?? result.caseTitle}${stepLabel}`);
 
-  // 统计行：有什么显示什么
+  if (isMultiStep) {
+    // 多步：逐步打印
+    for (const step of result.steps!) {
+      console.log(`\n  步骤 ${step.stepIndex}: ${step.instruction}`);
+      printCallStats(step.call, '  ');
+      if (step.verdict === 'PASS') {
+        console.log(`    判定: ✅ PASS`);
+      } else if (step.verdict === 'FAIL') {
+        console.log(`    判定: ❌ FAIL`);
+        for (const reason of step.failReasons) {
+          console.log(`      - ${reason}`);
+        }
+      }
+      printOutput(step.call, '    ');
+    }
+    // 汇总判定
+    console.log(`\n  总判定: ${verdict === 'PASS' ? '✅ PASS' : verdict === 'FAIL' ? '❌ FAIL' : '📋 DISPLAY'}`);
+    if (verdict === 'FAIL') {
+      for (const reason of failReasons) {
+        console.log(`    - ${reason}`);
+      }
+    }
+  } else {
+    // 单步：原有逻辑
+    const call = result.call;
+    console.log(`  指令: ${testCase.instruction ?? result.caseTitle}`);
+    printCallStats(call, '');
+    if (verdict === 'PASS') {
+      console.log(`  判定: ✅ PASS`);
+    } else if (verdict === 'FAIL') {
+      console.log(`  判定: ❌ FAIL`);
+      for (const reason of failReasons) {
+        console.log(`    - ${reason}`);
+      }
+    }
+    printOutput(call, '    ');
+  }
+}
+
+function printCallStats(call: CaseModelResult['call'], indent: string): void {
   const stats: string[] = [];
   stats.push(`耗时: ${(call.durationMs / 1000).toFixed(1)}s`);
   if (call.totalTokens !== null) {
     stats.push(`Token: ${call.totalTokens}`);
   } else if (call.promptTokens !== null || call.completionTokens !== null) {
-    const p = call.promptTokens ?? '?';
-    const c = call.completionTokens ?? '?';
-    stats.push(`Token: ${p}+${c}`);
+    stats.push(`Token: ${call.promptTokens ?? '?'}+${call.completionTokens ?? '?'}`);
   }
   if (call.finishReason && call.finishReason !== 'stop') {
     stats.push(`finish: ${call.finishReason}`);
   }
-  console.log(`  ${stats.join('  |  ')}`);
+  console.log(`${indent}  ${stats.join('  |  ')}`);
+}
 
-  // 判定行（DISPLAY 不显示判定）
-  if (verdict === 'PASS') {
-    console.log(`  判定: ✅ PASS`);
-  } else if (verdict === 'FAIL') {
-    console.log(`  判定: ❌ FAIL`);
-    for (const reason of failReasons) {
-      console.log(`    - ${reason}`);
-    }
-  }
-
-  // 回复原文
+function printOutput(call: CaseModelResult['call'], indent: string): void {
   if (call.success) {
-    console.log(`  回复:`);
-    // 每行缩进 4 格，超长时截断并提示
-    const lines = call.output.split('\n');
-    for (const line of lines) {
-      console.log(`    ${line}`);
+    console.log(`${indent}回复:`);
+    for (const line of call.output.split('\n')) {
+      console.log(`${indent}  ${line}`);
     }
   } else {
-    console.log(`  错误: ${call.error}`);
+    console.log(`${indent}错误: ${call.error}`);
   }
 }
 
@@ -189,7 +216,8 @@ function buildMarkdown(report: EvalReport): string {
   lines.push('');
 
   for (const c of cases) {
-    lines.push(`### ${c.id} ${c.title}`);
+    const stepCount = (c as { stepCount?: number }).stepCount;
+    lines.push(`### ${c.id} ${c.title}${stepCount ? `  _(${stepCount} 步)_` : ''}`);
     lines.push('');
     lines.push(`**指令**: ${c.instruction}`);
     lines.push('');
@@ -202,17 +230,36 @@ function buildMarkdown(report: EvalReport): string {
       const tokStr = r.call.totalTokens !== null ? ` / ${r.call.totalTokens} tok` : '';
       lines.push(`**${modelId}**（${durStr}${tokStr}）:`);
 
-      if (!r.call.success) {
-        lines.push(`> ❌ ${r.call.error}`);
-      } else {
-        // 引用块，每行加 > 前缀
-        for (const l of r.call.output.split('\n')) {
-          lines.push(`> ${l}`);
+      if (r.steps?.length) {
+        // 多步：逐步展示
+        for (const step of r.steps) {
+          const verdictIcon = step.verdict === 'PASS' ? '✅' : step.verdict === 'FAIL' ? '❌' : '📋';
+          lines.push(`> **步骤${step.stepIndex}** ${verdictIcon}  \`${step.instruction}\``);
+          if (step.call.success) {
+            for (const l of step.call.output.split('\n')) {
+              lines.push(`> ${l}`);
+            }
+          } else {
+            lines.push(`> ❌ ${step.call.error}`);
+          }
+          for (const reason of step.failReasons) {
+            lines.push(`> ⚠️ ${reason}`);
+          }
+          lines.push('>');
         }
-        if (r.verdict === 'FAIL') {
-          lines.push('');
-          for (const reason of r.failReasons) {
-            lines.push(`> ⚠️ 判定失败: ${reason}`);
+      } else {
+        // 单步
+        if (!r.call.success) {
+          lines.push(`> ❌ ${r.call.error}`);
+        } else {
+          for (const l of r.call.output.split('\n')) {
+            lines.push(`> ${l}`);
+          }
+          if (r.verdict === 'FAIL') {
+            lines.push('');
+            for (const reason of r.failReasons) {
+              lines.push(`> ⚠️ 判定失败: ${reason}`);
+            }
           }
         }
       }

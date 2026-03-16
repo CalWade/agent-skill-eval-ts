@@ -13,7 +13,7 @@
 import { callAgent, type AgentConfig } from '../agent.js';
 import { judge } from '../judge.js';
 import { getDefaultModel, switchModel, backupWorkspace, restoreWorkspace, resetFromBackup } from './openclawService.js';
-import type { ModelConfig, TestCase, TestSuite, CaseModelResult, EvalReport } from '../types.js';
+import type { ModelConfig, TestCase, TestSuite, CaseModelResult, StepResult, EvalReport } from '../types.js';
 
 function localTimeStr() {
   const d = new Date();
@@ -60,11 +60,82 @@ function sleep(ms: number): Promise<void> {
 type NormalizedCase = Omit<TestCase, 'id' | 'title'> & { id: string; title: string };
 
 function normalizeCases(cases: TestCase[]): NormalizedCase[] {
-  return cases.map((c, i) => ({
-    ...c,
-    id: c.id ?? String(i + 1),
-    title: c.title ?? c.instruction.slice(0, 40),
-  }));
+  return cases.map((c, i) => {
+    const firstInstruction = c.steps?.[0]?.instruction ?? c.instruction ?? '';
+    return {
+      ...c,
+      id: c.id ?? String(i + 1),
+      title: c.title ?? firstInstruction.slice(0, 40),
+    };
+  });
+}
+
+/**
+ * 执行单条用例（单步或多步），返回 CaseModelResult。
+ *
+ * 单步：直接调用 callAgent，judge 判定，sessionKey = eval:{runId}:{modelId}:{caseId}
+ * 多步：同一 sessionKey 复用，形成连续对话；每步独立 judge，结果聚合：
+ *   - steps 字段保留每步明细
+ *   - verdict：所有步骤全 PASS → PASS，任意 FAIL → FAIL，全 DISPLAY → DISPLAY
+ *   - failReasons：带 [步骤N] 前缀
+ *   - call：取最后一步的 CallResult（向后兼容）
+ */
+async function executeCase(
+  c: NormalizedCase,
+  modelId: string,
+  sessionKey: string,
+  agentConfig: AgentConfig,
+  intervalMs: number,
+): Promise<CaseModelResult> {
+  const isMultiStep = Array.isArray(c.steps) && c.steps.length > 0;
+
+  // ── 单步路径 ────────────────────────────────────────────────
+  if (!isMultiStep) {
+    const callResult = await callAgent(c.instruction ?? '', agentConfig);
+    const { verdict, failReasons } = judge(callResult.output, c.pass_criteria);
+    return { caseId: c.id, caseTitle: c.title, modelId, call: callResult, verdict, failReasons };
+  }
+
+  // ── 多步路径 ────────────────────────────────────────────────
+  const stepResults: StepResult[] = [];
+  let lastCall = undefined as Awaited<ReturnType<typeof callAgent>> | undefined;
+
+  for (let si = 0; si < c.steps!.length; si++) {
+    const step = c.steps![si];
+    if (si > 0 && intervalMs > 0) await sleep(intervalMs);
+
+    const callResult = await callAgent(step.instruction, agentConfig);
+    const { verdict, failReasons } = judge(callResult.output, step.pass_criteria);
+
+    stepResults.push({
+      stepIndex: si + 1,
+      instruction: step.instruction,
+      call: callResult,
+      verdict,
+      failReasons,
+    });
+    lastCall = callResult;
+  }
+
+  // 聚合 verdict
+  const allDisplay = stepResults.every((s) => s.verdict === 'DISPLAY');
+  const anyFail    = stepResults.some((s) => s.verdict === 'FAIL');
+  const verdict    = allDisplay ? 'DISPLAY' : anyFail ? 'FAIL' : 'PASS';
+
+  // 聚合 failReasons，加步骤前缀
+  const failReasons = stepResults.flatMap((s) =>
+    s.failReasons.map((r) => `[步骤${s.stepIndex}] ${r}`),
+  );
+
+  return {
+    caseId: c.id,
+    caseTitle: c.title,
+    modelId,
+    call: lastCall!,
+    verdict,
+    failReasons,
+    steps: stepResults,
+  };
 }
 
 export async function executeRun(
@@ -172,23 +243,20 @@ export async function executeRun(
 
     for (let ci = 0; ci < cases.length; ci++) {
       const c = cases[ci];
-      log(`  case [${ci + 1}/${cases.length}] id=${c.id}  "${c.title}"`);
+      const isMultiStep = Array.isArray(c.steps) && c.steps.length > 0;
+      log(`  case [${ci + 1}/${cases.length}] id=${c.id}  "${c.title}"${isMultiStep ? `  steps=${c.steps!.length}` : ''}`);
       callbacks.onCaseStart?.(model.id, c.id, c.title, ci, cases.length);
 
-      // local 模式：注入独立 sessionKey
+      // local 模式：注入独立 sessionKey；多步用例内各步共享同一 sessionKey
+      const sessionKey = `eval:${runId}:${model.id}:${c.id}`;
       const agentConfig = isLocal
-        ? { ...config.agent, sessionKey: `eval:${runId}:${model.id}:${c.id}` }
+        ? { ...config.agent, sessionKey }
         : config.agent;
 
-      const callResult = await callAgent(c.instruction, agentConfig);
-      const { verdict, failReasons } = judge(callResult.output, c.pass_criteria);
+      const r = await executeCase(c, model.id, sessionKey, agentConfig, config.intervalMs);
 
-      log(`  case ${c.id}: verdict=${verdict}  duration=${callResult.durationMs}ms${!callResult.success ? `  error=${callResult.error}` : ''}${failReasons.length ? `  failReasons=${JSON.stringify(failReasons)}` : ''}`);
+      log(`  case ${c.id}: verdict=${r.verdict}  duration=${r.call.durationMs}ms${!r.call.success ? `  error=${r.call.error}` : ''}${r.failReasons.length ? `  failReasons=${JSON.stringify(r.failReasons)}` : ''}`);
 
-      const r: CaseModelResult = {
-        caseId: c.id, caseTitle: c.title, modelId: model.id,
-        call: callResult, verdict, failReasons,
-      };
       allResults.push(r);
       callbacks.onCaseResult?.(r);
 
@@ -249,12 +317,16 @@ export function buildReport(
       return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}+08:00`;
     })(),
     modelIds: models.map((m) => m.id),
-    cases: suite.cases.map((c, i) => ({
-      id: c.id ?? String(i + 1),
-      title: c.title ?? c.instruction.slice(0, 40),
-      instruction: c.instruction,
-      sideEffect: c.side_effect ?? 'none',
-    })),
+    cases: suite.cases.map((c, i) => {
+      const firstInstruction = c.steps?.[0]?.instruction ?? c.instruction ?? '';
+      return {
+        id: c.id ?? String(i + 1),
+        title: c.title ?? firstInstruction.slice(0, 40),
+        instruction: firstInstruction,
+        sideEffect: c.side_effect ?? 'none',
+        ...(c.steps?.length ? { stepCount: c.steps.length } : {}),
+      };
+    }),
     results,
   };
 }

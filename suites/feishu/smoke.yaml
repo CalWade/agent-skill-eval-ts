@@ -1,5 +1,6 @@
 description: 飞书冒烟测试 v
 cases:
-  - instruction: 你好，你叫什么名字？
-  - instruction: |
+  - instruction: 我们这是一个全新的会话吗，你上一条回复是什么你记得吗？
+    id: '2'
+    title: |
       你一定要记住你叫 cal

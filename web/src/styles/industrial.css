@@ -239,7 +239,41 @@ body {
   letter-spacing: 0.05em !important;
 }
 
-/* Select */
+/* Select v2 — trigger wrapper */
+.el-select__wrapper {
+  background: var(--bg-input) !important;
+  box-shadow: 0 0 0 1px var(--border-input) inset !important;
+  border-radius: var(--radius-base) !important;
+  transition: box-shadow var(--transition-fast) !important;
+}
+
+.el-select__wrapper:hover {
+  box-shadow: 0 0 0 1px var(--border-strong) inset !important;
+}
+
+.el-select__wrapper.is-focused {
+  box-shadow: 0 0 0 1px var(--border-input-focus) inset, var(--shadow-focus) !important;
+}
+
+.el-select__placeholder,
+.el-select__selected-item {
+  color: var(--text-primary) !important;
+  font-size: var(--fs-base) !important;
+}
+
+.el-select__placeholder.is-transparent {
+  color: var(--text-muted) !important;
+}
+
+.el-select__input {
+  color: var(--text-primary) !important;
+}
+
+.el-select__caret {
+  color: var(--text-muted) !important;
+}
+
+/* Select v1 fallback */
 .el-select .el-input__wrapper {
   background: var(--bg-input) !important;
 }
@@ -344,4 +378,232 @@ body {
 .el-table td,
 .el-table th {
   border-bottom: 1px solid var(--border-base, rgba(255,255,255,0.08)) !important;
+}
+
+/* ── Textarea ───────────────────────────────────────────────── */
+.el-textarea__inner {
+  background: var(--bg-input) !important;
+  color: var(--text-primary) !important;
+  box-shadow: 0 0 0 1px var(--border-input) inset !important;
+  border-radius: var(--radius-base) !important;
+  font-size: var(--fs-base) !important;
+  font-family: var(--font-ui) !important;
+  resize: vertical;
+  transition: box-shadow var(--transition-fast) !important;
+}
+
+.el-textarea__inner:hover {
+  box-shadow: 0 0 0 1px var(--border-strong) inset !important;
+}
+
+.el-textarea__inner:focus {
+  box-shadow: 0 0 0 1px var(--border-input-focus) inset, var(--shadow-focus) !important;
+  outline: none;
+}
+
+.el-textarea__inner::placeholder {
+  color: var(--text-muted) !important;
+}
+
+/* ── Select dropdown panel（v2 popper）─────────────────────── */
+.el-popper.is-light.el-select__popper {
+  background: var(--bg-card-raised, #212830) !important;
+  border: 1px solid var(--border-strong) !important;
+  border-radius: var(--radius-card) !important;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.6) !important;
+}
+
+.el-popper.is-light.el-select__popper .el-popper__arrow::before {
+  background: var(--bg-card-raised, #212830) !important;
+  border-color: var(--border-strong) !important;
+}
+
+.el-select-dropdown {
+  background: transparent !important;
+}
+
+.el-select-dropdown__item {
+  color: var(--text-secondary) !important;
+  font-size: var(--fs-base) !important;
+}
+
+.el-select-dropdown__item:hover,
+.el-select-dropdown__item.hover {
+  background: var(--accent-cyan-glow) !important;
+  color: var(--text-primary) !important;
+}
+
+.el-select-dropdown__item.is-selected,
+.el-select-dropdown__item.selected {
+  color: var(--accent-cyan) !important;
+  font-weight: 600 !important;
+  background: rgba(0,200,212,0.08) !important;
+}
+
+/* ── Radio button group（运行模式切换）──────────────────────── */
+.el-radio-button__inner {
+  background: var(--bg-input) !important;
+  border-color: var(--border-input) !important;
+  color: var(--text-secondary) !important;
+  font-size: var(--fs-sm) !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.04em !important;
+  transition: background var(--transition-fast), color var(--transition-fast) !important;
+}
+
+.el-radio-button__original-radio:checked + .el-radio-button__inner {
+  background: var(--accent-cyan) !important;
+  border-color: var(--accent-cyan) !important;
+  color: #0d0f11 !important;
+  box-shadow: -1px 0 0 0 var(--accent-cyan) !important;
+}
+
+.el-radio-button:first-child .el-radio-button__inner {
+  border-radius: var(--radius-base) 0 0 var(--radius-base) !important;
+}
+
+.el-radio-button:last-child .el-radio-button__inner {
+  border-radius: 0 var(--radius-base) var(--radius-base) 0 !important;
+}
+
+/* ── Switch ─────────────────────────────────────────────────── */
+.el-switch__core {
+  background: var(--bg-card-raised) !important;
+  border-color: var(--border-strong) !important;
+}
+
+.el-switch.is-checked .el-switch__core {
+  background: var(--accent-cyan) !important;
+  border-color: var(--accent-cyan) !important;
+}
+
+/* ── Select trigger（已选中文字颜色）───────────────────────── */
+.el-select .el-input__inner {
+  color: var(--text-primary) !important;
+}
+
+/* ── Scrollbar in dropdown ──────────────────────────────────── */
+.el-scrollbar__bar.is-vertical > div,
+.el-scrollbar__thumb {
+  background: rgba(255,255,255,0.15) !important;
+}
+
+/* ── Dialog（SuitePanel 新建/重命名/模型编辑弹窗）─────────── */
+.el-dialog {
+  background: var(--bg-card-raised) !important;
+  border: 1px solid var(--border-strong) !important;
+  border-radius: var(--radius-card) !important;
+  box-shadow: 0 16px 48px rgba(0,0,0,0.7) !important;
+}
+
+.el-dialog__header {
+  background: var(--bg-card) !important;
+  border-bottom: 1px solid var(--border-panel) !important;
+  padding: 14px 20px !important;
+  margin: 0 !important;
+}
+
+.el-dialog__title {
+  font-family: var(--font-mono) !important;
+  font-size: var(--fs-sm) !important;
+  font-weight: 700 !important;
+  color: var(--accent-cyan) !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.08em !important;
+}
+
+.el-dialog__headerbtn .el-dialog__close {
+  color: var(--text-muted) !important;
+}
+
+.el-dialog__headerbtn:hover .el-dialog__close {
+  color: var(--text-primary) !important;
+}
+
+.el-dialog__body {
+  padding: 16px 20px !important;
+  color: var(--text-primary) !important;
+}
+
+.el-dialog__footer {
+  background: var(--bg-card) !important;
+  border-top: 1px solid var(--border-panel) !important;
+  padding: 12px 20px !important;
+}
+
+/* ── ElMessage toast ────────────────────────────────────────── */
+.el-message {
+  background: var(--bg-card-raised) !important;
+  border: 1px solid var(--border-strong) !important;
+  border-radius: var(--radius-card) !important;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.6) !important;
+  min-width: 200px !important;
+}
+
+.el-message .el-message__content {
+  color: var(--text-primary) !important;
+  font-size: var(--fs-sm) !important;
+  font-family: var(--font-ui) !important;
+}
+
+.el-message--success {
+  border-left: 3px solid var(--status-pass) !important;
+}
+.el-message--success .el-message__icon {
+  color: var(--status-pass) !important;
+}
+
+.el-message--warning {
+  border-left: 3px solid var(--warn-amber) !important;
+}
+.el-message--warning .el-message__icon {
+  color: var(--warn-amber) !important;
+}
+
+.el-message--error {
+  border-left: 3px solid var(--status-fail) !important;
+}
+.el-message--error .el-message__icon {
+  color: var(--status-fail) !important;
+}
+
+.el-message--info {
+  border-left: 3px solid var(--accent-cyan) !important;
+}
+.el-message--info .el-message__icon {
+  color: var(--accent-cyan) !important;
+}
+
+/* ── Popper arrow（下拉箭头小三角）─────────────────────────── */
+.el-popper.is-light .el-popper__arrow::before {
+  background: var(--bg-card-raised, #212830) !important;
+  border-color: var(--border-strong) !important;
+}
+
+/* ── Scrollbar in select dropdown ───────────────────────────── */
+.el-select__popper .el-scrollbar__thumb,
+.el-popper .el-scrollbar__thumb {
+  background: rgba(255,255,255,0.18) !important;
+}
+
+/* ── Tag（el-tag 通用）──────────────────────────────────────── */
+.el-tag.el-tag--success {
+  background: rgba(63,200,122,0.12) !important;
+  border-color: rgba(63,200,122,0.3) !important;
+  color: var(--status-pass) !important;
+}
+.el-tag.el-tag--warning {
+  background: rgba(245,166,35,0.12) !important;
+  border-color: rgba(245,166,35,0.3) !important;
+  color: var(--warn-amber) !important;
+}
+.el-tag.el-tag--danger {
+  background: rgba(224,74,74,0.12) !important;
+  border-color: rgba(224,74,74,0.3) !important;
+  color: var(--status-fail) !important;
+}
+.el-tag:not(.el-tag--success):not(.el-tag--warning):not(.el-tag--danger) {
+  background: rgba(0,200,212,0.08) !important;
+  border-color: rgba(0,200,212,0.25) !important;
+  color: var(--accent-cyan) !important;
 }

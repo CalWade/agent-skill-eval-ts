@@ -24,11 +24,14 @@
 
 <script setup lang="ts">
 import { ref, watch, nextTick } from 'vue'
+import { useConfirm } from '../composables/useConfirm'
 
 interface LogEntry { id: number; text: string; type: 'info' | 'success' | 'error' | 'muted' }
 
 const props = defineProps<{ logs: LogEntry[]; running: boolean }>()
 const emit = defineEmits<{ clear: [] }>()
+
+const confirm = useConfirm()
 
 const logEl = ref<HTMLElement | null>(null)
 
@@ -37,7 +40,19 @@ watch(() => props.logs.length, async () => {
   if (logEl.value) logEl.value.scrollTop = logEl.value.scrollHeight
 })
 
-function clear() { emit('clear') }
+async function clear() {
+  if (props.logs.length === 0) return
+  try {
+    await confirm({
+      title: '清空日志',
+      message: '确认清空当前所有日志？',
+      confirmText: '清空',
+    })
+  } catch {
+    return
+  }
+  emit('clear')
+}
 </script>
 
 <style scoped>

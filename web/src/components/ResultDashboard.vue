@@ -70,7 +70,26 @@
         <div class="reply-grid">
           <div v-for="modelId in report.modelIds" :key="modelId" class="reply-block">
             <div class="reply-model">{{ modelId }}</div>
-            <ReplyBlock :result="getResult(c.id, modelId)" />
+            <!-- 多步：展示各步骤结果 -->
+            <template v-if="getResult(c.id, modelId)?.steps?.length">
+              <div
+                v-for="step in getResult(c.id, modelId)!.steps"
+                :key="step.stepIndex"
+                class="step-result-block"
+              >
+                <div class="step-result-header">
+                  <span class="step-result-label">步骤 {{ step.stepIndex }}</span>
+                  <span
+                    class="step-verdict"
+                    :class="step.verdict === 'PASS' ? 'vpass' : step.verdict === 'FAIL' ? 'vfail' : 'vdisp'"
+                  >{{ step.verdict }}</span>
+                </div>
+                <div class="step-instruction">{{ step.instruction }}</div>
+                <ReplyBlock :result="stepAsResult(step, modelId)" />
+              </div>
+            </template>
+            <!-- 单步：原有展示 -->
+            <ReplyBlock v-else :result="getResult(c.id, modelId)" />
           </div>
         </div>
       </el-collapse-item>
@@ -81,7 +100,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch, nextTick } from 'vue'
 import * as echarts from 'echarts'
-import type { EvalReport, CaseModelResult } from '../types'
+import type { EvalReport, CaseModelResult, StepResult } from '../types'
 import CellResult from './CellResult.vue'
 import ReplyBlock from './ReplyBlock.vue'
 
@@ -121,6 +140,18 @@ const tableRows = computed(() => {
 
 function getResult(caseId: string, modelId: string): CaseModelResult | undefined {
   return props.report.results.find((r) => r.caseId === caseId && r.modelId === modelId)
+}
+
+/** 将 StepResult 适配为 ReplyBlock 接受的 CaseModelResult 形状 */
+function stepAsResult(step: StepResult, modelId: string): CaseModelResult {
+  return {
+    caseId: '',
+    caseTitle: step.instruction,
+    modelId,
+    call: step.call,
+    verdict: step.verdict,
+    failReasons: step.failReasons,
+  }
 }
 
 function rowClass({ row }: { row: { cells: Record<string, CaseModelResult | undefined> } }) {
@@ -394,6 +425,43 @@ watch(() => props.report, async () => { await nextTick(); initCharts() })
   letter-spacing: 0.04em;
   margin-bottom: 4px;
   font-weight: 600;
+}
+
+/* ── 步骤结果块 ── */
+.step-result-block {
+  border-left: 2px solid var(--border-panel, rgba(255,255,255,0.08));
+  padding-left: 8px;
+  margin-bottom: 10px;
+}
+.step-result-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 3px;
+}
+.step-result-label {
+  font-family: var(--font-mono, monospace);
+  font-size: 10px;
+  color: var(--accent-cyan, #00c8d4);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.step-verdict {
+  font-family: var(--font-mono, monospace);
+  font-size: 10px;
+  font-weight: 700;
+  border-radius: 3px;
+  padding: 1px 5px;
+}
+.step-verdict.vpass { color: var(--status-pass, #3fc87a); background: rgba(63,200,122,0.1); }
+.step-verdict.vfail { color: var(--status-fail, #e04a4a); background: rgba(224,74,74,0.1); }
+.step-verdict.vdisp { color: var(--text-muted, #666); background: rgba(255,255,255,0.05); }
+.step-instruction {
+  font-size: 11px;
+  color: var(--text-muted, #666);
+  margin-bottom: 4px;
+  font-style: italic;
 }
 </style>
 

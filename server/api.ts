@@ -218,11 +218,14 @@ function skillFromPath(file: string): string {
 
 /** 补全 TestCase 缺省字段，不修改原始 YAML 内容 */
 function normalizeCases(cases: TestCase[]): TestCase[] {
-  return cases.map((c, i) => ({
-    ...c,
-    id: c.id ?? String(i + 1),
-    title: c.title ?? c.instruction.slice(0, 40),
-  }));
+  return cases.map((c, i) => {
+    const firstInstruction = c.steps?.[0]?.instruction ?? c.instruction ?? '';
+    return {
+      ...c,
+      id: c.id ?? String(i + 1),
+      title: c.title ?? firstInstruction.slice(0, 40),
+    };
+  });
 }
 
 app.get('/api/suite', (req, res) => {
@@ -258,14 +261,20 @@ app.post('/api/suite', (req, res) => {
       // skill 与路径一致则省略（避免冗余），不一致时保留
       ...(suite.skill && suite.skill !== skillFromFile ? { skill: suite.skill } : {}),
       ...(suite.description ? { description: suite.description } : {}),
-      cases: suite.cases.map((c) => {
-        const autoId = String((suite.cases.indexOf(c)) + 1);
-        const autoTitle = c.instruction.slice(0, 40);
-        const out: TestCase = { instruction: c.instruction };
+      cases: suite.cases.map((c, idx) => {
+        const isMultiStep = Array.isArray(c.steps) && c.steps.length > 0;
+        const firstInstruction = c.steps?.[0]?.instruction ?? c.instruction ?? '';
+        const autoId = String(idx + 1);
+        const autoTitle = firstInstruction.slice(0, 40);
+        const out: TestCase = isMultiStep ? {} : { instruction: c.instruction };
         if (c.id && c.id !== autoId) out.id = c.id;
         if (c.title && c.title !== autoTitle) out.title = c.title;
         if (c.side_effect && c.side_effect !== 'none') out.side_effect = c.side_effect;
-        if (c.pass_criteria?.length) out.pass_criteria = c.pass_criteria;
+        if (isMultiStep) {
+          out.steps = c.steps;
+        } else if (c.pass_criteria?.length) {
+          out.pass_criteria = c.pass_criteria;
+        }
         return out;
       }),
     };

@@ -37,13 +37,23 @@ export type PassCriteria =
   | { type: 'output_not_contains'; text: string }
   | { type: 'output_contains_any'; texts: string[] };
 
+/** 多步用例中的单个步骤 */
+export interface TestStep {
+  instruction: string;
+  pass_criteria?: PassCriteria[];
+}
+
 export interface TestCase {
   /** 可选。省略时按数组下标自动生成（"1", "2", ...） */
   id?: string;
-  /** 可选。省略时取 instruction 前 40 字作为显示名 */
+  /** 可选。省略时取 instruction / 第一步 instruction 前 40 字作为显示名 */
   title?: string;
-  instruction: string;
+  /** 单步用例必填；steps 存在时可省略（取第一步 instruction） */
+  instruction?: string;
+  /** 多步用例：steps 内共享同一 sessionKey，形成连续对话 */
+  steps?: TestStep[];
   side_effect?: SideEffect;
+  /** 单步用例的判定条件；steps 存在时忽略，改用每步自身的 pass_criteria */
   pass_criteria?: PassCriteria[];
 }
 
@@ -77,14 +87,26 @@ export interface CallResult {
  */
 export type Verdict = 'PASS' | 'FAIL' | 'DISPLAY';
 
+/** 多步用例中单个步骤的执行结果 */
+export interface StepResult {
+  stepIndex: number;
+  instruction: string;
+  call: CallResult;
+  verdict: Verdict;
+  failReasons: string[];
+}
+
 export interface CaseModelResult {
   caseId: string;
   caseTitle: string;
   modelId: string;
+  /** 单步用例的调用结果；多步用例取最后一步（保持向后兼容） */
   call: CallResult;
   verdict: Verdict;
-  /** verdict=FAIL 时列出未通过的判定描述 */
+  /** verdict=FAIL 时列出未通过的判定描述，多步时带 [步骤N] 前缀 */
   failReasons: string[];
+  /** 多步用例时填充，单步用例不存在 */
+  steps?: StepResult[];
 }
 
 // ── 报告 ──────────────────────────────────────────────────────
@@ -100,6 +122,8 @@ export interface EvalReport {
     title: string;
     instruction: string;
     sideEffect: SideEffect;
+    /** 多步用例的步骤数，单步用例不存在 */
+    stepCount?: number;
   }>;
   results: CaseModelResult[];
 }

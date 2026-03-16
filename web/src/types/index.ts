@@ -8,10 +8,16 @@ export type PassCriteria =
   | { type: 'output_not_contains'; text: string }
   | { type: 'output_contains_any'; texts: string[] }
 
+export interface TestStep {
+  instruction: string
+  pass_criteria?: PassCriteria[]
+}
+
 export interface TestCase {
   id?: string
   title?: string
-  instruction: string
+  instruction?: string
+  steps?: TestStep[]
   side_effect?: SideEffect
   pass_criteria?: PassCriteria[]
 }
@@ -41,6 +47,14 @@ export interface CallResult {
   error: string | null
 }
 
+export interface StepResult {
+  stepIndex: number
+  instruction: string
+  call: CallResult
+  verdict: Verdict
+  failReasons: string[]
+}
+
 export interface CaseModelResult {
   caseId: string
   caseTitle: string
@@ -48,6 +62,7 @@ export interface CaseModelResult {
   call: CallResult
   verdict: Verdict
   failReasons: string[]
+  steps?: StepResult[]
 }
 
 export interface EvalReport {
@@ -60,6 +75,7 @@ export interface EvalReport {
     title: string
     instruction: string
     sideEffect: SideEffect
+    stepCount?: number
   }>
   results: CaseModelResult[]
 }

@@ -139,12 +139,17 @@ async function main(): Promise<void> {
     console.log(`模型: ${models.map((m) => m.id).join(', ')}\n`);
     cases.forEach((c, i) => {
       const id = c.id ?? String(i + 1);
-      const title = c.title ?? c.instruction.slice(0, 40);
+      const firstInstruction = c.steps?.[0]?.instruction ?? c.instruction ?? '';
+      const title = c.title ?? firstInstruction.slice(0, 40);
+      const isMultiStep = Array.isArray(c.steps) && c.steps.length > 0;
       const hasCriteria = (c.pass_criteria?.length ?? 0) > 0;
+      const judgeStr = isMultiStep
+        ? `${c.steps!.length} 步`
+        : hasCriteria ? c.pass_criteria!.length + '条' : '无（展示用）';
       console.log(
         `  ${id.padEnd(12)} ${title.padEnd(24)} ` +
         `副作用: ${(c.side_effect ?? 'none').padEnd(6)} ` +
-        `判定: ${hasCriteria ? c.pass_criteria!.length + '条' : '无（展示用）'}`,
+        `判定: ${judgeStr}`,
       );
     });
     return;
@@ -178,12 +183,16 @@ async function main(): Promise<void> {
     description: suite.description ?? '',
     timestamp,
     modelIds: models.map((m) => m.id),
-    cases: cases.map((c, i) => ({
-      id: c.id ?? String(i + 1),
-      title: c.title ?? c.instruction.slice(0, 40),
-      instruction: c.instruction,
-      sideEffect: c.side_effect ?? 'none',
-    })),
+    cases: cases.map((c, i) => {
+      const firstInstruction = c.steps?.[0]?.instruction ?? c.instruction ?? '';
+      return {
+        id: c.id ?? String(i + 1),
+        title: c.title ?? firstInstruction.slice(0, 40),
+        instruction: firstInstruction,
+        sideEffect: c.side_effect ?? 'none',
+        ...(c.steps?.length ? { stepCount: c.steps.length } : {}),
+      };
+    }),
     results,
   };
 
