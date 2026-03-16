@@ -181,7 +181,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, reactive, watch } from 'vue'
+import { ref, computed, onMounted, reactive, watch, nextTick } from 'vue'
 import { ElMessage } from 'element-plus'
 import { getModels, saveModels, getSuites, getSuite, saveSuite, getLocalModels } from '../api'
 import type { ModelConfig, TestSuite } from '../types'
@@ -235,11 +235,13 @@ function emitPayload() {
 watch([selectedModelIds, () => suite.cases.length], emitPayload, { deep: true })
 
 // 自动保存：suite 内容变化后 debounce 500ms 写入
+// initialized 为 false 时（loadSuite 期间）跳过，避免初始加载触发保存
+let initialized = false
 let saveTimer: ReturnType<typeof setTimeout> | null = null
 watch(
   suite,
   () => {
-    if (!selectedFile.value) return
+    if (!initialized || !selectedFile.value) return
     if (saveTimer) clearTimeout(saveTimer)
     saveTimer = setTimeout(autoSave, 500)
   },
@@ -276,6 +278,7 @@ onMounted(async () => {
 
 async function loadSuite() {
   if (!selectedFile.value) return
+  initialized = false
   try {
     const { suite: s } = await getSuite(selectedFile.value)
     suite.skill = s.skill
@@ -283,6 +286,10 @@ async function loadSuite() {
     suite.cases = s.cases
   } catch (e) {
     ElMessage.error(String(e))
+  } finally {
+    // 等下一个 tick，确保 watch 回调已经跳过本次赋值，再开启自动保存
+    await nextTick()
+    initialized = true
   }
 }
 
