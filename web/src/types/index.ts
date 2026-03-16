@@ -55,6 +55,13 @@ export interface StepResult {
   failReasons: string[]
 }
 
+export interface TraceMetrics {
+  llmTurns: number
+  toolCalls: number
+  toolCallSequence: string[]
+  toolErrors: number
+}
+
 export interface CaseModelResult {
   caseId: string
   caseTitle: string
@@ -63,6 +70,7 @@ export interface CaseModelResult {
   verdict: Verdict
   failReasons: string[]
   steps?: StepResult[]
+  trace?: TraceMetrics
 }
 
 export interface EvalReport {

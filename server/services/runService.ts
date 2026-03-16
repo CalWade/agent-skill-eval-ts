@@ -13,6 +13,7 @@
 import { callAgent, type AgentConfig } from '../agent.js';
 import { judge } from '../judge.js';
 import { getDefaultModel, switchModel, backupWorkspace, restoreWorkspace, resetFromBackup } from './openclawService.js';
+import { extractTrace } from './traceService.js';
 import type { ModelConfig, TestCase, TestSuite, CaseModelResult, StepResult, EvalReport } from '../types.js';
 
 function localTimeStr() {
@@ -86,6 +87,7 @@ async function executeCase(
   sessionKey: string,
   agentConfig: AgentConfig,
   intervalMs: number,
+  isLocal: boolean,
 ): Promise<CaseModelResult> {
   const isMultiStep = Array.isArray(c.steps) && c.steps.length > 0;
 
@@ -93,7 +95,8 @@ async function executeCase(
   if (!isMultiStep) {
     const callResult = await callAgent(c.instruction ?? '', agentConfig);
     const { verdict, failReasons } = judge(callResult.output, c.pass_criteria);
-    return { caseId: c.id, caseTitle: c.title, modelId, call: callResult, verdict, failReasons };
+    const trace = isLocal ? (extractTrace(sessionKey) ?? undefined) : undefined;
+    return { caseId: c.id, caseTitle: c.title, modelId, call: callResult, verdict, failReasons, trace };
   }
 
   // ── 多步路径 ────────────────────────────────────────────────
@@ -127,6 +130,9 @@ async function executeCase(
     s.failReasons.map((r) => `[步骤${s.stepIndex}] ${r}`),
   );
 
+  // 多步用例：trace 覆盖整个 session（同一 sessionKey 贯穿所有步骤）
+  const trace = isLocal ? (extractTrace(sessionKey) ?? undefined) : undefined;
+
   return {
     caseId: c.id,
     caseTitle: c.title,
@@ -135,6 +141,7 @@ async function executeCase(
     verdict,
     failReasons,
     steps: stepResults,
+    trace,
   };
 }
 
@@ -253,7 +260,7 @@ export async function executeRun(
         ? { ...config.agent, sessionKey }
         : config.agent;
 
-      const r = await executeCase(c, model.id, sessionKey, agentConfig, config.intervalMs);
+      const r = await executeCase(c, model.id, sessionKey, agentConfig, config.intervalMs, isLocal);
 
       log(`  case ${c.id}: verdict=${r.verdict}  duration=${r.call.durationMs}ms${!r.call.success ? `  error=${r.call.error}` : ''}${r.failReasons.length ? `  failReasons=${JSON.stringify(r.failReasons)}` : ''}`);
 

@@ -1,11 +1,29 @@
 <template>
   <div v-if="!result" class="cell-empty">-</div>
   <div v-else class="cell">
-    <span class="cell-verdict" :class="result.verdict.toLowerCase()">
-      {{ verdictIcon }}
-    </span>
-    <span class="cell-dur">{{ (result.call.durationMs / 1000).toFixed(1) }}s</span>
-    <span v-if="result.call.totalTokens" class="cell-tok">{{ result.call.totalTokens }}t</span>
+    <div class="cell-main">
+      <span class="cell-verdict" :class="result.verdict.toLowerCase()">
+        {{ verdictIcon }}
+      </span>
+      <span class="cell-dur">{{ (result.call.durationMs / 1000).toFixed(1) }}s</span>
+      <span v-if="result.call.totalTokens" class="cell-tok">{{ result.call.totalTokens }}t</span>
+    </div>
+    <!-- Trace 摘要 -->
+    <div v-if="result.trace" class="cell-trace">
+      <span class="cell-trace-item" title="LLM 轮次">
+        <span class="cell-trace-icon">⟳</span>{{ result.trace.llmTurns }}
+      </span>
+      <span class="cell-trace-item" title="工具调用次数">
+        <span class="cell-trace-icon">⚙</span>{{ result.trace.toolCalls }}
+      </span>
+      <span
+        v-if="result.trace.toolErrors > 0"
+        class="cell-trace-item cell-trace-err"
+        title="工具报错次数"
+      >
+        <span class="cell-trace-icon">!</span>{{ result.trace.toolErrors }}
+      </span>
+    </div>
   </div>
 </template>
 
@@ -26,8 +44,7 @@ const verdictIcon = computed(() => {
 <style scoped>
 .cell {
   display: flex;
-  align-items: center;
-  gap: 4px;
+  flex-direction: column;
   font-size: 12px;
 }
 .cell-empty {
@@ -61,5 +78,35 @@ const verdictIcon = computed(() => {
   color: var(--text-muted, #555);
   font-size: var(--fs-xs, 11px);
   font-variant-numeric: tabular-nums;
+}
+
+.cell-main {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.cell-trace {
+  display: flex;
+  gap: 6px;
+  margin-top: 3px;
+}
+
+.cell-trace-item {
+  font-family: var(--font-mono, monospace);
+  font-size: 10px;
+  color: var(--text-muted, #555);
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.cell-trace-icon {
+  font-size: 9px;
+  opacity: 0.7;
+}
+
+.cell-trace-err {
+  color: var(--status-fail, #e04a4a);
 }
 </style>

@@ -11,6 +11,31 @@
     <div v-if="result.failReasons.length" class="fail-reasons">
       <div v-for="r in result.failReasons" :key="r" class="fail-reason">▸ {{ r }}</div>
     </div>
+
+    <!-- Trace 指标（local 模式） -->
+    <div v-if="result.trace" class="trace-block">
+      <div class="trace-row">
+        <span class="trace-item">
+          <span class="trace-label">轮次</span>
+          <span class="trace-val">{{ result.trace.llmTurns }}</span>
+        </span>
+        <span class="trace-item" :class="{ 'trace-warn': result.trace.toolErrors > 0 }">
+          <span class="trace-label">工具</span>
+          <span class="trace-val">{{ result.trace.toolCalls }}</span>
+        </span>
+        <span v-if="result.trace.toolErrors > 0" class="trace-item trace-err">
+          <span class="trace-label">报错</span>
+          <span class="trace-val">{{ result.trace.toolErrors }}</span>
+        </span>
+      </div>
+      <div v-if="result.trace.toolCallSequence.length" class="trace-seq">
+        <span
+          v-for="(name, i) in result.trace.toolCallSequence"
+          :key="i"
+          class="trace-chip"
+        >{{ name }}</span>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -100,5 +125,54 @@ defineProps<{ result?: CaseModelResult }>()
   font-size: 11px;
   color: var(--status-fail, #e04a4a);
   line-height: 1.6;
+}
+
+/* ── Trace ── */
+.trace-block {
+  margin-top: 6px;
+  border-top: 1px solid var(--border-base, rgba(255,255,255,0.07));
+  padding-top: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.trace-row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+.trace-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.trace-label {
+  font-family: var(--font-mono, monospace);
+  font-size: 9px;
+  color: var(--text-muted, #555);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+.trace-val {
+  font-family: var(--font-mono, monospace);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--accent-cyan, #00c8d4);
+}
+.trace-warn .trace-val { color: var(--warn-amber, #f5a623); }
+.trace-err  .trace-val { color: var(--status-fail, #e04a4a); }
+.trace-seq {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+}
+.trace-chip {
+  font-family: var(--font-mono, monospace);
+  font-size: 10px;
+  color: var(--text-secondary, #7e8fa0);
+  background: rgba(0,200,212,0.06);
+  border: 1px solid rgba(0,200,212,0.15);
+  border-radius: var(--radius-sm, 2px);
+  padding: 1px 5px;
 }
 </style>

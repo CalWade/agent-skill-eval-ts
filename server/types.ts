@@ -78,6 +78,23 @@ export interface CallResult {
   error: string | null;
 }
 
+// ── Trace 指标（仅 local 模式）────────────────────────────────
+
+/**
+ * 从 OpenClaw session JSONL 解析出的执行路径指标。
+ * 仅 local 模式下填充，cloud 模式不存在。
+ */
+export interface TraceMetrics {
+  /** LLM 被调用的轮次（每条 assistant 消息算一轮） */
+  llmTurns: number;
+  /** 工具调用总次数 */
+  toolCalls: number;
+  /** 工具调用顺序，如 ["read", "gateway", "read"] */
+  toolCallSequence: string[];
+  /** toolResult.isError=true 的次数 */
+  toolErrors: number;
+}
+
 // ── 判定结果 ──────────────────────────────────────────────────
 
 /**
@@ -107,6 +124,8 @@ export interface CaseModelResult {
   failReasons: string[];
   /** 多步用例时填充，单步用例不存在 */
   steps?: StepResult[];
+  /** local 模式下从 session JSONL 解析的执行路径指标；cloud 模式不存在 */
+  trace?: TraceMetrics;
 }
 
 // ── 报告 ──────────────────────────────────────────────────────
