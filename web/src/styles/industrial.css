@@ -386,17 +386,21 @@ body {
   background: rgba(255,255,255,0.025) !important;
 }
 
-/* hover — 覆盖 EP 自身 hover-row class 和 CSS 变量 */
+/* 禁用表格行 hover 高亮 */
 .el-table {
-  --el-table-row-hover-bg-color: rgba(255,255,255,0.07);
+  --el-table-row-hover-bg-color: transparent;
 }
 
 .el-table .el-table__row:hover td.el-table__cell,
 .el-table__body tr.hover-row > td.el-table__cell,
 .el-table__body tr.hover-row.current-row > td.el-table__cell,
 .el-table--enable-row-hover .el-table__body tr:hover > td.el-table__cell {
-  background: rgba(255,255,255,0.07) !important;
-  color: var(--text-primary, #d4dce6) !important;
+  background: #181c20 !important;
+}
+
+.el-table .el-table__row:nth-child(even):hover td.el-table__cell,
+.el-table__body tr.hover-row:nth-child(even) > td.el-table__cell {
+  background: rgba(255,255,255,0.025) !important;
 }
 
 /* FAIL 行 */
