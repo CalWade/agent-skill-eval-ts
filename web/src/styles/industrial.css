@@ -346,38 +346,65 @@ body {
 
 /* Table */
 .el-table {
-  --el-table-bg-color: var(--bg-table-row, #1a1d27);
-  --el-table-tr-bg-color: var(--bg-table-row, #1a1d27);
-  --el-table-header-bg-color: var(--bg-card, #0f1117);
-  --el-table-border-color: var(--border-base, rgba(255,255,255,0.08));
-  --el-table-text-color: var(--text-primary, #ccc);
-  --el-table-header-text-color: var(--text-secondary, #888);
+  --el-table-bg-color: #181c20;
+  --el-table-tr-bg-color: #181c20;
+  --el-table-header-bg-color: #1c2026;
+  --el-table-border-color: rgba(255,255,255,0.08);
+  --el-table-text-color: var(--text-primary, #d4dce6);
+  --el-table-header-text-color: var(--text-secondary, #7e8fa0);
+  background: #181c20 !important;
 }
 
-.el-table .el-table__header th {
+/* 表格整体背景 */
+.el-table,
+.el-table__inner-wrapper,
+.el-table__body-wrapper,
+.el-table__header-wrapper {
+  background: #181c20 !important;
+}
+
+/* 所有单元格默认背景 */
+.el-table td.el-table__cell,
+.el-table th.el-table__cell {
+  background: #181c20 !important;
+  color: var(--text-primary, #d4dce6) !important;
+  border-bottom: 1px solid rgba(255,255,255,0.07) !important;
+}
+
+/* 表头 */
+.el-table .el-table__header th.el-table__cell {
+  background: #1c2026 !important;
+  color: var(--text-secondary, #7e8fa0) !important;
   text-transform: uppercase;
   letter-spacing: 0.06em;
   font-size: var(--fs-xs, 11px);
-  background: var(--bg-card, #0f1117) !important;
-  color: var(--text-secondary, #888) !important;
-  border-bottom: 1px solid var(--border-base, rgba(255,255,255,0.08));
+  border-bottom: 1px solid rgba(255,255,255,0.10) !important;
 }
 
-.el-table .el-table__row:nth-child(even) td {
-  background: var(--bg-table-row-alt, rgba(255,255,255,0.025)) !important;
+/* 偶数行交替色 */
+.el-table .el-table__row:nth-child(even) td.el-table__cell {
+  background: rgba(255,255,255,0.025) !important;
 }
 
-.el-table .el-table__row:hover td {
-  background: rgba(0,200,212,0.05) !important;
+/* hover */
+.el-table .el-table__row:hover td.el-table__cell {
+  background: rgba(0,200,212,0.06) !important;
 }
 
-.el-table .row-fail td {
+/* FAIL 行 */
+.el-table .row-fail td.el-table__cell {
   background: rgba(224,74,74,0.06) !important;
 }
 
-.el-table td,
-.el-table th {
-  border-bottom: 1px solid var(--border-base, rgba(255,255,255,0.08)) !important;
+/* fixed 列（sticky 定位）同步背景 */
+.el-table .el-table-fixed-column--left.el-table__cell,
+.el-table .el-table-fixed-column--right.el-table__cell {
+  background: #181c20 !important;
+}
+
+.el-table .el-table__row:nth-child(even) .el-table-fixed-column--left.el-table__cell,
+.el-table .el-table__row:nth-child(even) .el-table-fixed-column--right.el-table__cell {
+  background: rgba(255,255,255,0.025) !important;
 }
 
 /* ── Textarea ───────────────────────────────────────────────── */
