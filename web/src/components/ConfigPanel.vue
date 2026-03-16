@@ -62,7 +62,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, onMounted } from 'vue'
+import { ref, watch, onMounted, nextTick } from 'vue'
 import { ElMessage } from 'element-plus'
 import { getConfig, saveConfig } from '../api'
 
@@ -88,9 +88,10 @@ onMounted(async () => {
   try {
     const config = await getConfig()
     Object.assign(form.value, config)
-  } catch { /* 首次启动 .env 不存在，忽略 */ } finally {
-    loaded = true
-  }
+  } catch { /* 首次启动 .env 不存在，忽略 */ }
+  // 等 watch 回调跳过本次赋值后，再开启 dirty 追踪和自动保存
+  await nextTick()
+  loaded = true
 })
 
 watch(form, () => { if (loaded) dirty.value = true }, { deep: true })
